@@ -212,13 +212,22 @@ export default function Cocina() {
                 </div>
               )}
               {(order.items||[]).map((item,i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:10,
+                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10,
                   padding:'6px 0', borderBottom: i<order.items.length-1?'1px solid var(--border)':'none' }}>
                   <div style={{ background:'var(--accent)', color:'#111', fontWeight:900, fontSize:12,
                     width:28, height:28, borderRadius:'50%', display:'flex',
-                    alignItems:'center', justifyContent:'center', flexShrink:0 }}>×{item.qty}</div>
-                  <div style={{ flex:1, fontWeight:600, fontSize:14 }}>{item.name}</div>
-                  <div style={{ fontFamily:'var(--mono)', fontSize:12, color:'var(--muted)' }}>
+                    alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>×{item.qty}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:600, fontSize:14 }}>{item.name}</div>
+                    {item.nota && (
+                      <div style={{ fontSize:11, color:'var(--yellow)', marginTop:3,
+                        background:'rgba(245,200,66,.08)', borderRadius:6,
+                        padding:'3px 8px', display:'inline-block' }}>
+                        ✏️ {item.nota}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontFamily:'var(--mono)', fontSize:12, color:'var(--muted)', marginTop:2 }}>
                     S/{(item.price*item.qty).toFixed(2)}
                   </div>
                 </div>

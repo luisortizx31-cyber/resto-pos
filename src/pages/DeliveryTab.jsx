@@ -180,13 +180,46 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
   }
 
   const marcarEntregadoCocina = async (key) => {
-    await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), {
-      status: 'entregado',
-      entregadoISO: new Date().toISOString(),
-    })
-    setConfirmEntregado(null)
-    showToast('✅ Pedido marcado como entregado')
-    setTab('entregados')
+    try {
+      const pedido = pedidos.find(p => p.key === key)
+      const entregadoISO = new Date().toISOString()
+
+      // Marcar entregado en RTDB
+      await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), {
+        status: 'entregado',
+        entregadoISO,
+      })
+
+      // Guardar en historial Firestore
+      if (pedido) {
+        const total = pedido.total ?? (pedido.items || []).reduce((a, i) => a + i.price * i.qty, 0)
+        const batch = writeBatch(db)
+        const histRef = doc(collection(db, 'restaurantes', restoId, 'historial'))
+        batch.set(histRef, {
+          tipo:             'delivery',
+          cliente:          pedido.nombre    || '',
+          telefono:         pedido.telefono  || '',
+          direccion:        pedido.direccion || '',
+          items:            pedido.items     || [],
+          extras:           pedido.extras    || '',
+          extrasPrice:      pedido.extrasPrice || 0,
+          totalFinal:       total,
+          pagoYape:         pedido.pagoYape       || 0,
+          pagoEfectivo:     pedido.pagoEfectivo   || 0,
+          repartidorNombre: pedido.repartidorNombre || '',
+          completedAtISO:   entregadoISO,
+          creadoISO:        pedido.timeISO || entregadoISO,
+        })
+        await batch.commit()
+      }
+
+      setConfirmEntregado(null)
+      showToast('✅ Pedido marcado como entregado')
+      setTab('entregados')
+    } catch (e) {
+      console.error(e)
+      showToast('Error al marcar entregado', 'error')
+    }
   }
 
   const cambiarRepartidor = async (key, repartidor) => {

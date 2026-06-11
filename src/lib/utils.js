@@ -25,7 +25,8 @@ export function mergeItems(orders) {
   const map = {}
   orders.forEach(([, o]) => {
     ;(o.items || []).forEach(item => {
-      const k = item.id || item.name
+      // Usar name+price como key para que variantes del mismo plato con diferente precio no se fusionen
+      const k = `${item.name}__${item.price}`
       if (map[k]) map[k] = { ...map[k], qty: map[k].qty + item.qty }
       else map[k] = { ...item }
     })

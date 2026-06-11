@@ -323,37 +323,28 @@ export default function ClienteMesa() {
   }, [restoId])
 
   // ── Carrito helpers ─────────────────────────────────────────────
-  const setQty = (id, delta) => {
+  // carrito: { 'itemId__varIdx': { qty, price, name, variantName, category } }
+  const setQty = (itemId, varIdx, price, name, variantName, category, delta) => {
+    const key = `${itemId}__${varIdx}`
     setCarrito(prev => {
-      const next = Math.max(0, (prev[id] || 0) + delta)
+      const cur  = prev[key]?.qty || 0
+      const next = Math.max(0, cur + delta)
       const updated = { ...prev }
-      if (next === 0) delete updated[id]
-      else updated[id] = next
+      if (next === 0) delete updated[key]
+      else updated[key] = { qty:next, price, name, variantName, category, id:itemId }
       return updated
     })
   }
+  const getQty = (itemId, varIdx) => carrito[`${itemId}__${varIdx}`]?.qty || 0
 
-  const totalItems = Object.values(carrito).reduce((a, b) => a + b, 0)
-  const totalPrice = (() => {
-    if (!menu) return 0
-    let t = 0
-    Object.entries(carrito).forEach(([id, qty]) => {
-      for (const items of Object.values(menu)) {
-        const item = items.find(i => i.id === id)
-        if (item) { t += item.price * qty; break }
-      }
-    })
-    return t
-  })()
+  const totalItems = Object.values(carrito).reduce((a, v) => a + v.qty, 0)
+  const totalPrice = Object.values(carrito).reduce((a, v) => a + v.price * v.qty, 0)
 
   const esSoloBebidas = () => {
     if (!menu || totalItems === 0) return false
-    return Object.keys(carrito).every(id => {
-      for (const [cat, items] of Object.entries(menu)) {
-        if (items.find(i => i.id === id)) return BEBIDAS_CAT.includes(cat.toLowerCase().trim())
-      }
-      return false
-    })
+    return Object.values(carrito).every(v =>
+      BEBIDAS_CAT.includes((v.category || '').toLowerCase().trim())
+    )
   }
 
   // ── 5. Enviar pedido ─────────────────────────────────────────────
@@ -361,22 +352,14 @@ export default function ClienteMesa() {
     if (totalItems === 0 || sending) return
     setSending(true)
     try {
-      const itemsArr = []
-      if (menu) {
-        Object.entries(carrito).forEach(([id, qty]) => {
-          for (const items of Object.values(menu)) {
-            const item = items.find(i => i.id === id)
-            if (item) {
-              itemsArr.push({
-                id: item.id, name: item.name, price: item.price, qty,
-                category: item.category || '',
-                nota: notasPlato[id]?.trim() || '',
-              })
-              break
-            }
-          }
-        })
-      }
+      const itemsArr = Object.entries(carrito).map(([, v]) => ({
+        id:       v.id,
+        name:     v.variantName ? `${v.name} (${v.variantName})` : v.name,
+        price:    v.price,
+        qty:      v.qty,
+        category: v.category || '',
+        nota:     v.nota?.trim() || '',
+      }))
       const soloBebidas = esSoloBebidas()
 
       // Agregar sub-pedido al RTDB (flujo existente de cocina/mesero)
@@ -396,7 +379,10 @@ export default function ClienteMesa() {
       const prevItems = pedSnap.exists() ? (pedSnap.data().items || []) : []
       const mergedItems = [...prevItems]
       itemsArr.forEach(newItem => {
-        const idx = mergedItems.findIndex(i => i.id === newItem.id)
+        // Usar name+price como key para no fusionar variantes con mismo id pero diferente precio
+        const idx = mergedItems.findIndex(i =>
+          i.name === newItem.name && Number(i.price) === Number(newItem.price)
+        )
         if (idx >= 0) mergedItems[idx] = { ...mergedItems[idx], qty: mergedItems[idx].qty + newItem.qty }
         else mergedItems.push(newItem)
       })
@@ -405,7 +391,6 @@ export default function ClienteMesa() {
 
       setCarrito({})
       setNotas('')
-      setNotasPlato({})
       // Persistir pantalla seguimiento en sesión
       const sesActual = getClienteSession(mesaKey)
       if (sesActual) saveClienteSession(mesaKey, { ...sesActual, screen: 'seguimiento' })
@@ -799,76 +784,161 @@ export default function ClienteMesa() {
                   color:'#f5a623', textTransform:'uppercase', marginBottom:10,
                   borderBottom:'1px solid #21262d', paddingBottom:6 }}>{cat}</div>
                 {items.map(item => {
-                  const qty = carrito[item.id] || 0
-                  const disabled = deshabilitados.has(item.id)
+                  const disabled      = deshabilitados.has(item.id)
+                  const tieneVariantes = item.variantes?.length > 0
+                  const totalItemQty  = tieneVariantes
+                    ? item.variantes.reduce((a, _, i) => a + getQty(item.id, i), 0)
+                    : getQty(item.id, 0)
+
                   return (
                     <div key={item.id} style={{
-                      background: disabled ? 'rgba(255,255,255,.02)' : qty > 0 ? 'rgba(245,166,35,.08)' : '#161b22',
-                      border:`1.5px solid ${disabled ? '#21262d' : qty > 0 ? '#f5a623' : '#30363d'}`,
+                      background: disabled ? 'rgba(255,255,255,.02)' : totalItemQty > 0 ? 'rgba(245,166,35,.08)' : '#161b22',
+                      border:`1.5px solid ${disabled ? '#21262d' : totalItemQty > 0 ? '#f5a623' : '#30363d'}`,
                       borderRadius:14, marginBottom:8, overflow:'hidden',
                       transition:'all .15s', opacity: disabled ? 0.55 : 1 }}>
+
+                      {/* Cabecera */}
                       <div style={{ display:'flex', alignItems:'stretch' }}>
                         {item.fotoUrl ? (
                           <img src={item.fotoUrl} alt={item.name} loading="lazy"
-                            style={{ width:80, height:80, objectFit:'cover', flexShrink:0,
+                            style={{ width:80, objectFit:'cover', flexShrink:0,
                               filter: disabled ? 'grayscale(1)' : 'none' }} />
                         ) : (
-                          <div style={{ width:80, height:80, background:'#21262d',
+                          <div style={{ width:80, minHeight:72, background:'#21262d',
                             display:'flex', alignItems:'center', justifyContent:'center',
                             fontSize:28, flexShrink:0, color:'#30363d' }}>🍽</div>
                         )}
-                        <div style={{ flex:1, padding:'10px 12px', display:'flex',
-                          alignItems:'center', justifyContent:'space-between' }}>
-                          <div>
-                            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                              <div style={{ fontWeight:600, fontSize:15, color: disabled ? '#8b949e' : '#c9d1d9',
-                                textDecoration: disabled ? 'line-through' : 'none' }}>{item.name}</div>
-                              {disabled && (
-                                <span style={{ background:'rgba(255,77,77,.15)', color:'#ff4d4d',
-                                  fontSize:9, fontWeight:800, padding:'2px 7px',
-                                  borderRadius:20, letterSpacing:1 }}>AGOTADO</span>
-                              )}
+                        <div style={{ flex:1, padding:'10px 12px' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                            <div style={{ fontWeight:600, fontSize:15,
+                              color: disabled ? '#8b949e' : '#c9d1d9',
+                              textDecoration: disabled ? 'line-through' : 'none' }}>{item.name}</div>
+                            {disabled && (
+                              <span style={{ background:'rgba(255,77,77,.15)', color:'#ff4d4d',
+                                fontSize:9, fontWeight:800, padding:'2px 7px',
+                                borderRadius:20, letterSpacing:1 }}>AGOTADO</span>
+                            )}
+                          </div>
+                          {/* Precio simple o badges de variantes */}
+                          {tieneVariantes ? (
+                            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                              {item.variantes.map((v,vi) => (
+                                <span key={vi} style={{
+                                  background:'rgba(245,166,35,.1)',
+                                  border:'1px solid rgba(245,166,35,.25)',
+                                  borderRadius:20, padding:'3px 8px',
+                                  fontSize:11, fontWeight:700, color:'#f5a623',
+                                  fontFamily:'monospace', whiteSpace:'nowrap' }}>
+                                  {v.nombre} · S/{Number(v.precio).toFixed(2)}
+                                </span>
+                              ))}
                             </div>
+                          ) : (
                             <div style={{ color: disabled ? '#8b949e' : '#f5a623',
                               fontWeight:800, fontSize:14, fontFamily:'monospace', marginTop:2 }}>
                               S/ {item.price}.00
                             </div>
-                          </div>
-                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <button onClick={() => !disabled && setQty(item.id,-1)}
-                              disabled={disabled}
-                              style={{ width:34, height:34, borderRadius:'50%', background:'#21262d',
-                                border:'1.5px solid #30363d', color:'white', fontSize:20,
-                                cursor: disabled ? 'not-allowed' : 'pointer',
-                                display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>−</button>
-                            <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:17,
-                              color: qty > 0 ? '#f5a623' : '#8b949e',
-                              minWidth:22, textAlign:'center' }}>{qty}</span>
-                            <button onClick={() => !disabled && setQty(item.id,1)}
-                              disabled={disabled}
-                              style={{ width:34, height:34, borderRadius:'50%',
-                                background: disabled ? '#21262d' : qty > 0 ? '#f5a623' : '#21262d',
-                                border:'1.5px solid #30363d',
-                                color: disabled ? '#8b949e' : qty > 0 ? '#111' : 'white',
-                                fontSize:20, cursor: disabled ? 'not-allowed' : 'pointer',
-                                display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>+</button>
-                          </div>
+                          )}
                         </div>
                       </div>
-                      {/* Nota por plato — aparece solo si qty > 0 */}
-                      {qty > 0 && !disabled && (
-                        <div style={{ padding:'0 12px 10px', borderTop:'1px solid #21262d' }}>
-                          <input
-                            type="text"
-                            placeholder="✏️ Ej: sin cebolla, extra picante..."
-                            value={notasPlato[item.id] || ''}
-                            onChange={e => setNotasPlato(p => ({ ...p, [item.id]: e.target.value }))}
-                            style={{ width:'100%', background:'#21262d', border:'1px solid #30363d',
-                              borderRadius:8, padding:'7px 10px', color:'white',
-                              fontSize:12, fontFamily:'system-ui,sans-serif', outline:'none',
-                              boxSizing:'border-box' }}
-                          />
+
+                      {/* Variantes con botones */}
+                      {!disabled && tieneVariantes && (
+                        <div style={{ borderTop:'1px solid #21262d' }}>
+                          {item.variantes.map((v, vi) => {
+                            const key = `${item.id}__${vi}`
+                            const qty = getQty(item.id, vi)
+                            return (
+                              <div key={vi}>
+                                <div style={{
+                                  display:'flex', alignItems:'center',
+                                  justifyContent:'space-between', padding:'9px 12px',
+                                  borderBottom: vi < item.variantes.length-1 && !qty ? '1px solid #21262d' : 'none',
+                                  background: qty > 0 ? 'rgba(245,166,35,.04)' : 'none' }}>
+                                  <div>
+                                    <span style={{ fontWeight:700, fontSize:13,
+                                      color: qty > 0 ? '#f5a623' : '#c9d1d9' }}>{v.nombre}</span>
+                                    <span style={{ fontFamily:'monospace', fontSize:12,
+                                      color:'#f5a623', marginLeft:8, fontWeight:700 }}>
+                                      S/{Number(v.precio).toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                    <button onClick={() => setQty(item.id, vi, v.precio, item.name, v.nombre, item.category, -1)}
+                                      style={{ width:32, height:32, borderRadius:'50%', background:'#21262d',
+                                        border:'1.5px solid #30363d', color:'white', fontSize:18,
+                                        cursor:'pointer', display:'flex', alignItems:'center',
+                                        justifyContent:'center', fontWeight:700 }}>−</button>
+                                    <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:16,
+                                      color: qty > 0 ? '#f5a623' : '#8b949e',
+                                      minWidth:20, textAlign:'center' }}>{qty}</span>
+                                    <button onClick={() => setQty(item.id, vi, v.precio, item.name, v.nombre, item.category, 1)}
+                                      style={{ width:32, height:32, borderRadius:'50%',
+                                        background: qty > 0 ? '#f5a623' : '#21262d',
+                                        border:'1.5px solid #30363d',
+                                        color: qty > 0 ? '#111' : 'white',
+                                        fontSize:18, cursor:'pointer', display:'flex', alignItems:'center',
+                                        justifyContent:'center', fontWeight:700 }}>+</button>
+                                  </div>
+                                </div>
+                                {qty > 0 && (
+                                  <div style={{ padding:'0 12px 8px',
+                                    borderBottom: vi < item.variantes.length-1 ? '1px solid #21262d' : 'none' }}>
+                                    <input type="text"
+                                      placeholder="✏️ Ej: sin cebolla, extra picante..."
+                                      value={carrito[key]?.nota || ''}
+                                      onChange={e => setCarrito(prev => prev[key]
+                                        ? { ...prev, [key]: { ...prev[key], nota: e.target.value } }
+                                        : prev)}
+                                      style={{ width:'100%', background:'#21262d', border:'1px solid #30363d',
+                                        borderRadius:8, padding:'7px 10px', color:'white',
+                                        fontSize:12, fontFamily:'system-ui,sans-serif', outline:'none',
+                                        boxSizing:'border-box' }} />
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
+                      )}
+
+                      {/* Plato simple — botones + nota */}
+                      {!disabled && !tieneVariantes && (
+                        <>
+                          <div style={{ display:'flex', alignItems:'center', gap:8,
+                            justifyContent:'flex-end', padding:'0 12px 10px' }}>
+                            <button onClick={() => setQty(item.id, 0, item.price, item.name, '', item.category, -1)}
+                              style={{ width:34, height:34, borderRadius:'50%', background:'#21262d',
+                                border:'1.5px solid #30363d', color:'white', fontSize:20,
+                                cursor:'pointer', display:'flex', alignItems:'center',
+                                justifyContent:'center', fontWeight:700 }}>−</button>
+                            <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:17,
+                              color: getQty(item.id,0) > 0 ? '#f5a623' : '#8b949e',
+                              minWidth:22, textAlign:'center' }}>{getQty(item.id,0)}</span>
+                            <button onClick={() => setQty(item.id, 0, item.price, item.name, '', item.category, 1)}
+                              style={{ width:34, height:34, borderRadius:'50%',
+                                background: getQty(item.id,0) > 0 ? '#f5a623' : '#21262d',
+                                border:'1.5px solid #30363d',
+                                color: getQty(item.id,0) > 0 ? '#111' : 'white',
+                                fontSize:20, cursor:'pointer', display:'flex', alignItems:'center',
+                                justifyContent:'center', fontWeight:700 }}>+</button>
+                          </div>
+                          {getQty(item.id, 0) > 0 && (
+                            <div style={{ padding:'0 12px 10px', borderTop:'1px solid #21262d' }}>
+                              <input type="text"
+                                placeholder="✏️ Ej: sin cebolla, extra picante..."
+                                value={carrito[`${item.id}__0`]?.nota || ''}
+                                onChange={e => setCarrito(prev => {
+                                  const key = `${item.id}__0`
+                                  return prev[key] ? { ...prev, [key]: { ...prev[key], nota: e.target.value } } : prev
+                                })}
+                                style={{ width:'100%', background:'#21262d', border:'1px solid #30363d',
+                                  borderRadius:8, padding:'7px 10px', color:'white',
+                                  fontSize:12, fontFamily:'system-ui,sans-serif', outline:'none',
+                                  boxSizing:'border-box' }} />
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   )

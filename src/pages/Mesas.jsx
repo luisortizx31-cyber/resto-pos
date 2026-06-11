@@ -17,15 +17,7 @@ export default function Mesas() {
   const [deletingKey, setDeletingKey]     = useState(null)
   const [confirmDeleteKey, setConfirmDeleteKey] = useState(null)
   const [descuento, setDescuento]         = useState({ tipo:'pct', valor:'' })
-  const [pago, setPago] = useState({ yape: '', efectivo: '' })
-
-  // Cuando se abre el modal de cobro, pre-llenar efectivo con el total
-  useEffect(() => {
-    if (confirming) {
-      const { total } = calcTotal(confirming.orders, descuento)
-      setPago({ yape: '', efectivo: total.toFixed(2) })
-    }
-  }, [confirming])
+  const [pago, setPago]                   = useState({ yape: '', efectivo: '' }) // montos por método
   const [comprobante, setComprobante]     = useState(null)
   const [numMesas, setNumMesas]           = useState(10)
   const [editandoMesas, setEditandoMesas] = useState(false)
@@ -194,24 +186,28 @@ export default function Mesas() {
     const merged = mergeItems(confirming.orders)
     const pagoYape     = parseFloat(pago.yape)     || 0
     const pagoEfectivo = parseFloat(pago.efectivo) || 0
-    // Efectivo real recibido: si pagó más en efectivo que lo que faltaba, guardar solo lo que correspondía
-    const efectivoNecesario = Math.max(0, total - pagoYape)
-    const efectivoRealRecibido = pagoEfectivo > efectivoNecesario
-      ? efectivoNecesario   // tenía vuelto, guardamos solo lo que le correspondía al efectivo
-      : pagoEfectivo        // pagó exacto o menos (combinado correcto)
+    // Efectivo real recibido (sin vuelto)
+    const efectivoNecesario      = Math.max(0, total - pagoYape)
+    const efectivoRealRecibido   = pagoEfectivo > efectivoNecesario ? efectivoNecesario : pagoEfectivo
     try {
-      // 1. Guardar en historial y limpiar RTDB
-      for (const [key,order] of confirming.orders) {
-        try {
-          await addDoc(collection(db, 'restaurantes', restoId, 'historial'), {
-            mesa: order.mesa, items: order.items||[],
-            extras: order.extras||'', extrasPrice: order.extrasPrice||0,
-            timeISO: order.timeISO||new Date().toISOString(),
-            completedAtISO: new Date().toISOString(),
-            descuento: descuentoAmt, totalFinal: total,
-            pagoYape, pagoEfectivo: efectivoRealRecibido,
-          })
-        } catch {}
+      // 1. Guardar UN SOLO registro en historial con el total correcto y todos los items fusionados
+      try {
+        await addDoc(collection(db, 'restaurantes', restoId, 'historial'), {
+          mesa:          confirming.num,
+          items:         merged,
+          extras:        confirming.orders.map(([,o]) => o.extras||'').filter(Boolean).join(' / '),
+          extrasPrice:   confirming.orders.reduce((a,[,o]) => a+(o.extrasPrice||0), 0),
+          timeISO:       confirming.orders[0]?.[1]?.timeISO || new Date().toISOString(),
+          completedAtISO: new Date().toISOString(),
+          descuento:     descuentoAmt,
+          totalFinal:    total,
+          pagoYape,
+          pagoEfectivo:  efectivoRealRecibido,
+        })
+      } catch {}
+
+      // 2. Limpiar todos los pedidos RTDB de la mesa
+      for (const [key] of confirming.orders) {
         await remove(ref(rtdb, `${restoId}/pedidos_activos/${key}`))
       }
 
@@ -252,11 +248,15 @@ export default function Mesas() {
           }
         }
 
-        // Guardar cobradoEn — invalida sesiones de clientes anteriores a este timestamp
         const cobradoEn = new Date().toISOString()
         await setDoc(mesaDocRef, { estado: 'libre', pedidoActivoId: null, cobradoEn }, { merge: true })
+      } catch {}
 
-        // Cerrar QR de esta mesa automáticamente al cobrar
+      // 3. Limpiar RTDB mesas_activas
+      await remove(ref(rtdb, `${restoId}/mesas_activas/${confirming.num}`))
+
+      // 4. Cerrar QR de esta mesa automáticamente
+      try {
         const restoRef  = doc(db, 'restaurantes', restoId)
         const restoSnap = await getDoc(restoRef)
         const mesasOff  = restoSnap.exists() ? (restoSnap.data().qrMesasOff || []) : []
@@ -264,9 +264,6 @@ export default function Mesas() {
           await updateDoc(restoRef, { qrMesasOff: [...mesasOff, confirming.num] })
         }
       } catch {}
-
-      // 3. Limpiar RTDB mesas_activas
-      await remove(ref(rtdb, `${restoId}/mesas_activas/${confirming.num}`))
 
       setComprobante({ num:confirming.num, orders:confirming.orders,
         mergedItems:merged, bruto, descuentoAmt, total,
@@ -583,20 +580,7 @@ export default function Mesas() {
                 </div>
                 <input className="input" type="number" min="0"
                   placeholder={descuento.tipo==='pct'?'Ej: 10 (10%)':'Ej: 5 (S/5)'}
-                  value={descuento.valor} onChange={e => {
-                    setDescuento(d => ({ ...d, valor:e.target.value }))
-                    // Recalcular efectivo con el nuevo descuento
-                    if (confirming) {
-                      const brutoVal = confirming.orders.reduce((a,[,o]) =>
-                        a + (o.items||[]).reduce((s,i)=>s+i.price*i.qty,0) + (o.extrasPrice||0), 0)
-                      const dVal = parseFloat(e.target.value) || 0
-                      const dAmt = descuento.tipo==='pct' ? brutoVal*dVal/100 : dVal
-                      const newTotal = Math.max(0, brutoVal - dAmt)
-                      const yapeVal = parseFloat(pago.yape) || 0
-                      const resto = Math.max(0, newTotal - yapeVal)
-                      setPago(p => ({ ...p, efectivo: resto > 0 ? resto.toFixed(2) : '' }))
-                    }
-                  }} />
+                  value={descuento.valor} onChange={e => setDescuento(d => ({ ...d, valor:e.target.value }))} />
               </div>
               <div style={{ background:'var(--surface)', borderRadius:12, padding:14, marginBottom:16 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--muted)', marginBottom:6 }}>
@@ -629,12 +613,7 @@ export default function Mesas() {
                       <input type="number" min="0" step="0.10"
                         placeholder="0.00"
                         value={pago.yape}
-                        onChange={e => {
-                          const yapeVal = parseFloat(e.target.value) || 0
-                          const { total } = calcTotal(confirming.orders, descuento)
-                          const resto = Math.max(0, total - yapeVal)
-                          setPago({ yape: e.target.value, efectivo: resto > 0 ? resto.toFixed(2) : '' })
-                        }}
+                        onChange={e => setPago(p => ({ ...p, yape: e.target.value }))}
                         style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border)',
                           borderRadius:8, padding:'6px 8px', color:'white',
                           fontFamily:'var(--mono)', fontSize:15, fontWeight:700,
