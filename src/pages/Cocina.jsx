@@ -168,6 +168,7 @@ export default function Cocina() {
 
   const renderMesaCard = (mesa, mesaOrders, isListo) => {
     const allItems  = mesaOrders.flatMap(o => o.items || [])
+    // Total incluye bebidas aunque no se muestren
     const totalMesa = allItems.reduce((a,i) => a+i.price*i.qty, 0)
       + mesaOrders.reduce((a,o) => a+(o.extrasPrice||0), 0)
     return (
@@ -198,7 +199,13 @@ export default function Cocina() {
           {!isListo ? <Timer timeISO={mesaOrders[0]?.timeISO} /> : <div style={{ fontSize:32 }}>✅</div>}
         </div>
         <div style={{ padding:'12px 18px' }}>
-          {mesaOrders.map((order, oi) => (
+          {mesaOrders.map((order, oi) => {
+            // Filtrar bebidas para cocina — no se preparan aquí
+            const itemsCocina = (order.items||[]).filter(i =>
+              !BEBIDAS_CAT.includes((i.category||'').toLowerCase().trim())
+            )
+            if (itemsCocina.length === 0 && !order.extras) return null
+            return (
             <div key={order.key}>
               {mesaOrders.length > 1 && (
                 <div style={{ display:'flex', alignItems:'center', gap:8,
@@ -211,9 +218,9 @@ export default function Cocina() {
                   <div style={{ height:1, flex:1, background:'var(--border)' }} />
                 </div>
               )}
-              {(order.items||[]).map((item,i) => (
+              {itemsCocina.map((item,i) => (
                 <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10,
-                  padding:'6px 0', borderBottom: i<order.items.length-1?'1px solid var(--border)':'none' }}>
+                  padding:'6px 0', borderBottom: i<itemsCocina.length-1?'1px solid var(--border)':'none' }}>
                   <div style={{ background:'var(--accent)', color:'#111', fontWeight:900, fontSize:12,
                     width:28, height:28, borderRadius:'50%', display:'flex',
                     alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>×{item.qty}</div>
@@ -269,7 +276,7 @@ export default function Cocina() {
                 </button>
               )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
     )

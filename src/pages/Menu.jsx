@@ -176,6 +176,12 @@ export default function Menu() {
     return acc
   }, {})
 
+  // Iterar en el orden guardado en Firestore, con categorías sin orden al final
+  const categoriesOrdenadas = [
+    ...categories.filter(c => byCategory[c]),
+    ...Object.keys(byCategory).filter(c => !categories.includes(c)),
+  ]
+
   // ── Render ───────────────────────────────────────────────────────
   return (
     <div className="page">
@@ -219,10 +225,10 @@ export default function Menu() {
               <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>Cargando...</div>
             ) : items.length === 0 ? (
               <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>Sin platos aún</div>
-            ) : Object.entries(byCategory).map(([cat, catItems]) => (
+            ) : categoriesOrdenadas.map(cat => (
               <div key={cat} style={{ marginBottom:20 }}>
                 <div className="section-label">{cat}</div>
-                {catItems.map(item => {
+                {(byCategory[cat] || []).map(item => {
                   const disabled = deshabilitados.has(item.id)
                   const tieneVariantes = item.variantes?.length > 0
                   return (

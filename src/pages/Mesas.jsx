@@ -630,8 +630,15 @@ export default function Mesas() {
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <span style={{ fontSize:12, color:'var(--muted)', fontFamily:'var(--mono)' }}>S/</span>
                       <input type="number" min="0" step="0.10"
-                        placeholder="0.00"
+                        placeholder={total.toFixed(2)}
                         value={pago.efectivo}
+                        onFocus={e => {
+                          // Si no hay nada ingresado aún, auto-rellenar con el total menos lo que ya está en Yape
+                          if (!pago.efectivo) {
+                            const resto = total - (parseFloat(pago.yape) || 0)
+                            if (resto > 0) setPago(p => ({ ...p, efectivo: resto.toFixed(2) }))
+                          }
+                        }}
                         onChange={e => setPago(p => ({ ...p, efectivo: e.target.value }))}
                         style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border)',
                           borderRadius:8, padding:'6px 8px', color:'white',

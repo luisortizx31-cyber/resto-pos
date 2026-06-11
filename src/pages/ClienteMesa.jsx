@@ -129,15 +129,28 @@ export default function ClienteMesa() {
   useEffect(() => {
     async function loadMenu() {
       try {
-        const snap = await getDocs(collection(db, 'restaurantes', restoId, 'menu'))
-        if (snap.empty) { setMenu(DEFAULT_MENU); return }
+        // Cargar orden de categorías y platos en paralelo
+        const [menuSnap, catSnap] = await Promise.all([
+          getDocs(collection(db, 'restaurantes', restoId, 'menu')),
+          getDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias')),
+        ])
+        const catOrder = catSnap.exists() ? (catSnap.data().lista || []) : []
+        if (menuSnap.empty) { setMenu(DEFAULT_MENU); return }
         const bycat = {}
-        snap.forEach(d => {
+        menuSnap.forEach(d => {
           const data = d.data()
           if (!bycat[data.category]) bycat[data.category] = []
           bycat[data.category].push({ id: d.id, ...data })
         })
-        setMenu(Object.keys(bycat).length ? bycat : {})
+        if (!Object.keys(bycat).length) { setMenu({}); return }
+        // Reordenar según catOrder — categorías sin orden van al final
+        const ordered = {}
+        const allCats = [
+          ...catOrder.filter(c => bycat[c]),
+          ...Object.keys(bycat).filter(c => !catOrder.includes(c)),
+        ]
+        allCats.forEach(c => { ordered[c] = bycat[c] })
+        setMenu(ordered)
       } catch { setMenu({}) }
     }
     loadMenu()
