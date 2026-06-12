@@ -434,7 +434,8 @@ export default function Delivery() {
       ) : (() => {
         const q = buscar.toLowerCase().trim()
         const menuFiltrado = Object.entries(menu).reduce((acc, [cat, items]) => {
-          const f = items.filter(i => !q || i.name.toLowerCase().includes(q))
+          const catMatch = cat.toLowerCase().includes(q)
+          const f = items.filter(i => !q || catMatch || i.name.toLowerCase().includes(q))
           if (f.length) acc[cat] = f
           return acc
         }, {})
