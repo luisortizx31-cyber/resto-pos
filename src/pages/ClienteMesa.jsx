@@ -114,6 +114,7 @@ export default function ClienteMesa() {
   const [buscar, setBuscar]   = useState('')
   const [deshabilitados, setDeshabilitados] = useState(new Set())
   const [notasPlato, setNotasPlato] = useState({}) // { itemId: 'sin cebolla' }
+  const [showConfirm, setShowConfirm] = useState(false)
   const unsubPedidoRef = useRef(null)
 
   // Persistir screen en sesión para restaurar al refrescar
@@ -792,10 +793,19 @@ export default function ClienteMesa() {
                 <div>Sin resultados para "<strong>{buscar}</strong>"</div>
               </div>
             ) : Object.entries(menuFiltrado).map(([cat, items]) => (
-              <div key={cat} style={{ padding:'16px 16px 4px' }}>
-                <div style={{ fontSize:11, fontWeight:800, letterSpacing:3,
-                  color:'#f5a623', textTransform:'uppercase', marginBottom:10,
-                  borderBottom:'1px solid #21262d', paddingBottom:6 }}>{cat}</div>
+              <div key={cat} style={{ marginBottom:8 }}>
+                <div style={{
+                  margin:'12px 12px 8px',
+                  background:'linear-gradient(135deg, rgba(245,166,35,.12), rgba(245,166,35,.04))',
+                  border:'1.5px solid rgba(245,166,35,.35)',
+                  borderRadius:14, padding:'12px 16px',
+                  display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ width:4, height:32, background:'#f5a623',
+                    borderRadius:4, flexShrink:0 }} />
+                  <div style={{ fontWeight:900, fontSize:20, color:'#f5a623',
+                    letterSpacing:1, textTransform:'uppercase' }}>{cat}</div>
+                </div>
+                <div style={{ padding:'0 12px 4px' }}>
                 {items.map(item => {
                   const disabled      = deshabilitados.has(item.id)
                   const tieneVariantes = item.variantes?.length > 0
@@ -832,21 +842,8 @@ export default function ClienteMesa() {
                                 borderRadius:20, letterSpacing:1 }}>AGOTADO</span>
                             )}
                           </div>
-                          {/* Precio simple o badges de variantes */}
-                          {tieneVariantes ? (
-                            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
-                              {item.variantes.map((v,vi) => (
-                                <span key={vi} style={{
-                                  background:'rgba(245,166,35,.1)',
-                                  border:'1px solid rgba(245,166,35,.25)',
-                                  borderRadius:20, padding:'3px 8px',
-                                  fontSize:11, fontWeight:700, color:'#f5a623',
-                                  fontFamily:'monospace', whiteSpace:'nowrap' }}>
-                                  {v.nombre} · S/{Number(v.precio).toFixed(2)}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
+                          {/* Solo mostrar precio si NO tiene variantes */}
+                          {!tieneVariantes && (
                             <div style={{ color: disabled ? '#8b949e' : '#f5a623',
                               fontWeight:800, fontSize:14, fontFamily:'monospace', marginTop:2 }}>
                               S/ {item.price}.00
@@ -956,6 +953,7 @@ export default function ClienteMesa() {
                     </div>
                   )
                 })}
+                </div>
               </div>
             ))}
           </>
@@ -982,7 +980,8 @@ export default function ClienteMesa() {
             <span style={{ color:'#f5a623', fontFamily:'monospace', fontWeight:800 }}>S/ {totalPrice.toFixed(2)}</span>
           </div>
         )}
-        <button onClick={enviar} disabled={totalItems === 0 || sending}
+        <button onClick={() => totalItems > 0 && setShowConfirm(true)}
+          disabled={totalItems === 0 || sending}
           style={{ width:'100%',
             background: totalItems === 0 ? '#21262d' : '#f5a623',
             color: totalItems === 0 ? '#8b949e' : '#111',
@@ -990,9 +989,94 @@ export default function ClienteMesa() {
             fontSize:15, fontWeight:800,
             cursor: totalItems === 0 ? 'not-allowed' : 'pointer',
             letterSpacing:2, transition:'all .2s' }}>
-          {sending ? 'ENVIANDO...' : totalItems === 0 ? 'SELECCIONA ALGO' : '📨 ENVIAR PEDIDO'}
+          {totalItems === 0 ? 'SELECCIONA ALGO' : '📋 VER RESUMEN Y CONFIRMAR'}
         </button>
       </div>
+
+      {/* Modal confirmación */}
+      {showConfirm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)',
+          zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
+          onClick={() => setShowConfirm(false)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background:'#161b22', borderRadius:'20px 20px 0 0',
+              width:'100%', maxWidth:480, maxHeight:'82vh', overflowY:'auto',
+              padding:'24px 20px 32px', borderTop:'2px solid #30363d' }}>
+
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <div style={{ fontSize:30, marginBottom:6 }}>📋</div>
+              <div style={{ fontWeight:900, fontSize:18, letterSpacing:2,
+                color:'#f5a623', textTransform:'uppercase' }}>Tu Pedido</div>
+              <div style={{ fontSize:12, color:'#8b949e', marginTop:2 }}>Mesa {mesaNum} — revisa antes de confirmar</div>
+            </div>
+
+            {/* Items */}
+            <div style={{ marginBottom:16 }}>
+              {Object.values(carrito).map((v, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between',
+                  alignItems:'flex-start', padding:'10px 0',
+                  borderBottom:'1px solid #21262d' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                      <span style={{ background:'#f5a623', color:'#111',
+                        fontWeight:900, fontSize:11, width:24, height:24, borderRadius:'50%',
+                        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        ×{v.qty}
+                      </span>
+                      <span style={{ fontWeight:700, fontSize:14, color:'white' }}>
+                        {v.variantName ? `${v.name} (${v.variantName})` : v.name}
+                      </span>
+                    </div>
+                    {(v.nota || notasPlato[v.id]) && (
+                      <div style={{ fontSize:11, color:'#f5c842', marginTop:4, marginLeft:32,
+                        background:'rgba(245,200,66,.08)', borderRadius:6,
+                        padding:'2px 8px', display:'inline-block' }}>
+                        ✏️ {v.nota || notasPlato[v.id]}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontFamily:'monospace', fontWeight:800,
+                    color:'#f5a623', fontSize:14, marginLeft:12, flexShrink:0 }}>
+                    S/{(v.price * v.qty).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+              {notas.trim() && (
+                <div style={{ padding:'10px 0', borderBottom:'1px solid #21262d' }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:'#f5c842' }}>📝 {notas}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Total */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+              padding:'14px 16px', background:'rgba(245,166,35,.08)', borderRadius:14,
+              border:'1.5px solid rgba(245,166,35,.3)', marginBottom:20 }}>
+              <span style={{ fontWeight:900, fontSize:16, letterSpacing:1, color:'white' }}>TOTAL</span>
+              <span style={{ fontFamily:'monospace', fontWeight:900,
+                fontSize:22, color:'#f5a623' }}>S/{totalPrice.toFixed(2)}</span>
+            </div>
+
+            {/* Botones */}
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => setShowConfirm(false)}
+                style={{ flex:1, padding:14, borderRadius:14, border:'1.5px solid #30363d',
+                  background:'#21262d', color:'#8b949e', fontWeight:800,
+                  fontSize:14, cursor:'pointer', fontFamily:'system-ui,sans-serif' }}>
+                ✏️ Editar
+              </button>
+              <button onClick={() => { setShowConfirm(false); enviar() }}
+                disabled={sending}
+                style={{ flex:2, padding:14, borderRadius:14, border:'none',
+                  background:'#f5a623', color:'#111', fontWeight:900,
+                  fontSize:15, cursor:'pointer', letterSpacing:1,
+                  fontFamily:'system-ui,sans-serif' }}>
+                {sending ? 'ENVIANDO...' : '📨 CONFIRMAR PEDIDO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
