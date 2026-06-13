@@ -294,8 +294,26 @@ export default function Historial() {
           {orders.map(order => {
             const total       = getTotal(order)
             const esDelivery  = order.tipo === 'delivery'
-            const tieneYape   = esDelivery ? order.clientePago === 'yape' : order.pagoYape > 0
-            const tieneEfec   = esDelivery ? order.clientePago !== 'yape' : order.pagoEfectivo > 0
+            // Soportar ambos formatos: clientePago (Repartidor) y pagoYape/pagoEfectivo (DeliveryTab)
+            let tieneYape, tieneEfec, montoYape, montoEfec
+            if (esDelivery) {
+              if (order.clientePago) {
+                tieneYape  = order.clientePago === 'yape'
+                tieneEfec  = order.clientePago !== 'yape'
+                montoYape  = tieneYape  ? total : 0
+                montoEfec  = tieneEfec  ? total : 0
+              } else {
+                tieneYape  = (order.pagoYape  || 0) > 0
+                tieneEfec  = (order.pagoEfectivo || 0) > 0
+                montoYape  = order.pagoYape      || 0
+                montoEfec  = order.pagoEfectivo  || 0
+              }
+            } else {
+              tieneYape  = (order.pagoYape     || 0) > 0
+              tieneEfec  = (order.pagoEfectivo || 0) > 0
+              montoYape  = order.pagoYape      || 0
+              montoEfec  = order.pagoEfectivo  || 0
+            }
             return (
               <div key={order.id} style={{ background:'var(--card)',
                 border:`1.5px solid ${esDelivery ? 'rgba(74,158,255,.4)' : 'var(--border)'}`,
@@ -332,6 +350,27 @@ export default function Historial() {
                           📍 {order.clienteDireccion}
                         </div>
                       )}
+                      {esDelivery && order.repartidorNombre && (
+                        <div style={{ fontSize:11, marginTop:4, display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ background:'rgba(74,158,255,.12)', border:'1px solid rgba(74,158,255,.3)',
+                            borderRadius:20, padding:'2px 8px', color:'#4a9eff', fontWeight:700 }}>
+                            🛵 {order.repartidorNombre}
+                          </span>
+                          {order.repartidorAnterior && order.repartidorAnterior !== order.repartidorNombre && (
+                            <span style={{ fontSize:10, color:'var(--muted)' }}>
+                              (antes: {order.repartidorAnterior})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {esDelivery && !order.repartidorNombre && (
+                        <div style={{ fontSize:11, marginTop:4 }}>
+                          <span style={{ background:'rgba(255,77,77,.1)', border:'1px solid rgba(255,77,77,.3)',
+                            borderRadius:20, padding:'2px 8px', color:'var(--red)', fontWeight:700 }}>
+                            Sin repartidor asignado
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div style={{ textAlign:'right' }}>
@@ -356,7 +395,7 @@ export default function Historial() {
                       <span style={{ fontSize:11, color:'#a78bfa' }}>📲 Yape</span>
                       <span style={{ fontFamily:'var(--mono)', fontSize:12,
                         fontWeight:700, color:'#a78bfa' }}>
-                        S/{esDelivery ? total.toFixed(2) : Number(order.pagoYape).toFixed(2)}
+                        S/{montoYape.toFixed(2)}
                       </span>
                     </div>
                   )}
@@ -368,7 +407,7 @@ export default function Historial() {
                       <span style={{ fontSize:11, color:'var(--green)' }}>💵 Efectivo</span>
                       <span style={{ fontFamily:'var(--mono)', fontSize:12,
                         fontWeight:700, color:'var(--green)' }}>
-                        S/{esDelivery ? total.toFixed(2) : Number(order.pagoEfectivo).toFixed(2)}
+                        S/{montoEfec.toFixed(2)}
                       </span>
                     </div>
                   )}

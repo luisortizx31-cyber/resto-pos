@@ -1001,18 +1001,20 @@ export default function ClienteMesa() {
           onClick={() => setShowConfirm(false)}>
           <div onClick={e => e.stopPropagation()}
             style={{ background:'#161b22', borderRadius:'20px 20px 0 0',
-              width:'100%', maxWidth:480, maxHeight:'82vh', overflowY:'auto',
-              padding:'24px 20px 32px', borderTop:'2px solid #30363d' }}>
+              width:'100%', maxWidth:480, maxHeight:'85vh',
+              display:'flex', flexDirection:'column',
+              borderTop:'2px solid #30363d' }}>
 
-            <div style={{ textAlign:'center', marginBottom:20 }}>
+            {/* Header fijo */}
+            <div style={{ textAlign:'center', padding:'20px 20px 12px', flexShrink:0 }}>
               <div style={{ fontSize:30, marginBottom:6 }}>📋</div>
               <div style={{ fontWeight:900, fontSize:18, letterSpacing:2,
                 color:'#f5a623', textTransform:'uppercase' }}>Tu Pedido</div>
               <div style={{ fontSize:12, color:'#8b949e', marginTop:2 }}>Mesa {mesaNum} — revisa antes de confirmar</div>
             </div>
 
-            {/* Items */}
-            <div style={{ marginBottom:16 }}>
+            {/* Items — scrolleable */}
+            <div style={{ overflowY:'auto', flex:1, padding:'0 20px' }}>
               {Object.values(carrito).map((v, i) => (
                 <div key={i} style={{ display:'flex', justifyContent:'space-between',
                   alignItems:'flex-start', padding:'10px 0',
@@ -1049,31 +1051,32 @@ export default function ClienteMesa() {
               )}
             </div>
 
-            {/* Total */}
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-              padding:'14px 16px', background:'rgba(245,166,35,.08)', borderRadius:14,
-              border:'1.5px solid rgba(245,166,35,.3)', marginBottom:20 }}>
-              <span style={{ fontWeight:900, fontSize:16, letterSpacing:1, color:'white' }}>TOTAL</span>
-              <span style={{ fontFamily:'monospace', fontWeight:900,
-                fontSize:22, color:'#f5a623' }}>S/{totalPrice.toFixed(2)}</span>
-            </div>
-
-            {/* Botones */}
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={() => setShowConfirm(false)}
-                style={{ flex:1, padding:14, borderRadius:14, border:'1.5px solid #30363d',
-                  background:'#21262d', color:'#8b949e', fontWeight:800,
-                  fontSize:14, cursor:'pointer', fontFamily:'system-ui,sans-serif' }}>
-                ✏️ Editar
-              </button>
-              <button onClick={() => { setShowConfirm(false); enviar() }}
-                disabled={sending}
-                style={{ flex:2, padding:14, borderRadius:14, border:'none',
-                  background:'#f5a623', color:'#111', fontWeight:900,
-                  fontSize:15, cursor:'pointer', letterSpacing:1,
-                  fontFamily:'system-ui,sans-serif' }}>
-                {sending ? 'ENVIANDO...' : '📨 CONFIRMAR PEDIDO'}
-              </button>
+            {/* Total + botones — fijos abajo */}
+            <div style={{ padding:'16px 20px 28px', flexShrink:0,
+              borderTop:'1px solid #30363d', background:'#161b22' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                padding:'12px 16px', background:'rgba(245,166,35,.08)', borderRadius:14,
+                border:'1.5px solid rgba(245,166,35,.3)', marginBottom:14 }}>
+                <span style={{ fontWeight:900, fontSize:16, letterSpacing:1, color:'white' }}>TOTAL</span>
+                <span style={{ fontFamily:'monospace', fontWeight:900,
+                  fontSize:22, color:'#f5a623' }}>S/{totalPrice.toFixed(2)}</span>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={() => setShowConfirm(false)}
+                  style={{ flex:1, padding:14, borderRadius:14, border:'1.5px solid #30363d',
+                    background:'#21262d', color:'#8b949e', fontWeight:800,
+                    fontSize:14, cursor:'pointer', fontFamily:'system-ui,sans-serif' }}>
+                  ✏️ Editar
+                </button>
+                <button onClick={() => { setShowConfirm(false); enviar() }}
+                  disabled={sending}
+                  style={{ flex:2, padding:14, borderRadius:14, border:'none',
+                    background:'#f5a623', color:'#111', fontWeight:900,
+                    fontSize:15, cursor:'pointer', letterSpacing:1,
+                    fontFamily:'system-ui,sans-serif' }}>
+                  {sending ? 'ENVIANDO...' : '📨 CONFIRMAR PEDIDO'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

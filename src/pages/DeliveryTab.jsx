@@ -207,6 +207,7 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
           pagoYape:         pedido.pagoYape       || 0,
           pagoEfectivo:     pedido.pagoEfectivo   || 0,
           repartidorNombre: pedido.repartidorNombre || '',
+          repartidorAnterior: pedido.repartidorAnterior || null,
           completedAtISO:   entregadoISO,
           creadoISO:        pedido.timeISO || entregadoISO,
         })
@@ -223,11 +224,14 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
   }
 
   const cambiarRepartidor = async (key, repartidor) => {
+    const pedidoActual = pedidos.find(p => p.key === key)
+    const nombreAnterior = pedidoActual?.repartidorNombre || null
     await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), {
       status: 'listo',
-      repartidorNombre: repartidor === 'otro' ? 'Otro' : repartidor.nombre,
-      repartidorId:     repartidor === 'otro' ? 'otro' : repartidor.id,
-      repartidorCelular:repartidor === 'otro' ? '' : (repartidor.celular || ''),
+      repartidorNombre:   repartidor === 'otro' ? 'Otro' : repartidor.nombre,
+      repartidorId:       repartidor === 'otro' ? 'otro' : repartidor.id,
+      repartidorCelular:  repartidor === 'otro' ? '' : (repartidor.celular || ''),
+      repartidorAnterior: nombreAnterior,
       tomadoISO: null,
     })
     setCambiandoRep(null)

@@ -54,7 +54,7 @@ export default function Delivery() {
     getDoc(doc(db, 'restaurantes', restoId)).then(snap => {
       if (snap.exists()) setRestoInfo(snap.data())
     })
-    getDocs(collection(db, 'restaurantes', restoId, 'menu')).then(snap => {
+    getDocs(collection(db, 'restaurantes', restoId, 'menu')).then(async snap => {
       if (snap.empty) { setMenu({}); return }
       const byCategory = {}
       snap.forEach(d => {
@@ -62,6 +62,18 @@ export default function Delivery() {
         if (!byCategory[data.category]) byCategory[data.category] = []
         byCategory[data.category].push({ id: d.id, ...data })
       })
+      // Respetar orden de categorías guardado en config
+      try {
+        const catSnap = await getDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias'))
+        if (catSnap.exists() && catSnap.data().lista?.length) {
+          const orden = catSnap.data().lista
+          const sorted = {}
+          orden.forEach(cat => { if (byCategory[cat]) sorted[cat] = byCategory[cat] })
+          Object.keys(byCategory).forEach(cat => { if (!sorted[cat]) sorted[cat] = byCategory[cat] })
+          setMenu(sorted)
+          return
+        }
+      } catch {}
       setMenu(byCategory)
     }).catch(() => setMenu({}))
     // Platos deshabilitados
@@ -394,7 +406,7 @@ export default function Delivery() {
         padding:'16px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
           <div style={{ fontSize:11, color:'#8b949e', letterSpacing:3, textTransform:'uppercase' }}>Delivery</div>
-          <div style={{ fontWeight:900, fontSize:22, color:'#f5a623' }}>{restoInfo?.nombre || 'Restaurante'}</div>
+          <div style={{ fontWeight:900, fontSize:30, color:'#f5a623', lineHeight:1.1 }}>{restoInfo?.nombre || 'Restaurante'}</div>
         </div>
         {misPedidos.length > 0 && (
           <button onClick={() => setScreen('seguimiento')}

@@ -439,65 +439,98 @@ export default function Mesas() {
         const pedido = confirmandoCliente[1]
         const pedidoKey = confirmandoCliente[0]
         const pedidoItems = pedido?.items || []
-        const pedidoTotal = pedidoItems.reduce((a,i) => a+i.price*i.qty, 0)
+        const pedidoTotal = pedidoItems.reduce((a,i) => a+i.price*i.qty, 0) + (pedido?.extrasPrice||0)
         return (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)',
-            zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-            <div style={{ background:'var(--card)', borderRadius:24,
-              border:'2px solid var(--blue)', width:'100%', maxWidth:380,
-              maxHeight:'92vh', overflowY:'auto', overflow:'hidden' }}>
+            zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+            <div style={{ background:'var(--card)', borderRadius:'20px 20px 0 0',
+              border:'2px solid var(--blue)', borderBottom:'none', width:'100%', maxWidth:480,
+              maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+
+              {/* Header fijo */}
               <div style={{
-                  background: pedido?.soloBebidas ? 'linear-gradient(135deg,#0d2a1a,#0a1f12)' : 'linear-gradient(135deg,#1a2a4a,#0d1a35)',
-                  padding:'24px 22px 20px', textAlign:'center',
-                  borderBottom: `2px solid ${pedido?.soloBebidas ? 'var(--green)' : 'var(--blue)'}` }}>
-                <div style={{ fontSize:11, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff', letterSpacing:4,
-                  textTransform:'uppercase', marginBottom:6, fontWeight:800 }}>📱 PEDIDO DEL CLIENTE</div>
+                background: pedido?.soloBebidas ? 'linear-gradient(135deg,#0d2a1a,#0a1f12)' : 'linear-gradient(135deg,#1a2a4a,#0d1a35)',
+                padding:'20px 22px 16px', textAlign:'center', flexShrink:0,
+                borderRadius:'18px 18px 0 0',
+                borderBottom:`2px solid ${pedido?.soloBebidas ? 'var(--green)' : 'var(--blue)'}` }}>
+                <div style={{ fontSize:11, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff',
+                  letterSpacing:4, textTransform:'uppercase', marginBottom:4, fontWeight:800 }}>
+                  📱 PEDIDO DEL CLIENTE
+                </div>
                 {pedido?.soloBebidas && (
                   <div style={{ display:'inline-block', background:'rgba(39,201,122,.2)',
                     border:'1.5px solid var(--green)', borderRadius:20,
-                    padding:'4px 16px', fontSize:11, fontWeight:800,
-                    color:'var(--green)', letterSpacing:2, marginBottom:10 }}>
+                    padding:'3px 14px', fontSize:11, fontWeight:800,
+                    color:'var(--green)', letterSpacing:2, marginBottom:8 }}>
                     🥤 SOLO BEBIDAS — NO VA A COCINA
                   </div>
                 )}
-                <div style={{ fontSize:90, fontWeight:900, lineHeight:1,
-                  color:'white', fontFamily:'var(--mono)',
+                <div style={{ fontSize:80, fontWeight:900, lineHeight:1, color:'white',
+                  fontFamily:'var(--mono)',
                   textShadow: pedido?.soloBebidas ? '0 0 40px rgba(39,201,122,.6)' : '0 0 40px rgba(74,158,255,.6)' }}>
                   {pedido?.mesa}
                 </div>
-                <div style={{ fontSize:13, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff', fontWeight:700, letterSpacing:3, marginTop:4 }}>MESA</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:8 }}>
+                <div style={{ fontSize:13, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff',
+                  fontWeight:700, letterSpacing:3, marginTop:2 }}>MESA</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:6 }}>
                   {pedido?.timeISO ? new Date(pedido.timeISO).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) : ''}
                 </div>
               </div>
-              <div style={{ padding:'18px 22px 0' }}>
-                <div style={{ background:'var(--surface)', borderRadius:12, padding:12, marginBottom:14 }}>
+
+              {/* Items — scrolleable */}
+              <div style={{ overflowY:'auto', flex:1, padding:'16px 22px 8px' }}>
+                <div style={{ background:'var(--surface)', borderRadius:12, padding:12 }}>
                   {pedidoItems.map((item,i) => (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between',
-                      fontSize:14, padding:'5px 0',
-                      borderBottom:i<pedidoItems.length-1?'1px solid var(--border)':'none',
-                      color:'var(--muted2)' }}>
-                      <span>×{item.qty} {item.name}</span>
-                      <span style={{ fontFamily:'var(--mono)' }}>S/{(item.price*item.qty).toFixed(2)}</span>
+                    <div key={i} style={{ padding:'8px 0',
+                      borderBottom:i<pedidoItems.length-1?'1px solid var(--border)':'none' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between',
+                        fontSize:14, color:'var(--muted2)' }}>
+                        <span style={{ fontWeight:700 }}>×{item.qty} {item.name}</span>
+                        <span style={{ fontFamily:'var(--mono)', fontWeight:700 }}>
+                          S/{(item.price*item.qty).toFixed(2)}
+                        </span>
+                      </div>
+                      {item.nota && (
+                        <div style={{ fontSize:11, color:'var(--yellow)', marginTop:3,
+                          background:'rgba(245,200,66,.08)', borderRadius:6,
+                          padding:'2px 8px', display:'inline-block' }}>
+                          ✏️ {item.nota}
+                        </div>
+                      )}
                     </div>
                   ))}
-                  {pedido?.extras && <div style={{ marginTop:8, fontSize:12, color:'var(--yellow)' }}>📝 {pedido.extras}</div>}
+                  {pedido?.extras && (
+                    <div style={{ marginTop:8, fontSize:12, color:'var(--yellow)',
+                      paddingTop:8, borderTop:'1px solid var(--border)' }}>
+                      📝 {pedido.extras}
+                      {pedido.extrasPrice > 0 && (
+                        <span style={{ float:'right', fontFamily:'var(--mono)', fontWeight:700 }}>
+                          S/{Number(pedido.extrasPrice).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div style={{ display:'flex', justifyContent:'space-between',
-                    fontWeight:800, fontSize:16, marginTop:10,
-                    paddingTop:8, borderTop:'1px solid var(--border)' }}>
+                    fontWeight:800, fontSize:17, marginTop:10,
+                    paddingTop:8, borderTop:'2px solid var(--border)' }}>
                     <span>Total</span>
-                    <span style={{ color:'var(--green)', fontFamily:'var(--mono)' }}>S/{pedidoTotal.toFixed(2)}</span>
+                    <span style={{ color:'var(--green)', fontFamily:'var(--mono)' }}>
+                      S/{pedidoTotal.toFixed(2)}
+                    </span>
                   </div>
                 </div>
-              </div>
-              <div style={{ padding:'0 22px 22px' }}>
                 {getPedidosEsperando().length > 1 && (
-                  <div style={{ fontSize:12, color:'var(--blue)', textAlign:'center', marginBottom:12 }}>
+                  <div style={{ fontSize:12, color:'var(--blue)', textAlign:'center', marginTop:10 }}>
                     +{getPedidosEsperando().length-1} pedido(s) más esperando
                   </div>
                 )}
+              </div>
+
+              {/* Botones — fijos abajo */}
+              <div style={{ padding:'12px 22px 28px', flexShrink:0,
+                borderTop:'1px solid var(--border)', background:'var(--card)' }}>
                 <button className="btn btn-success"
-                  style={{ width:'100%', fontSize:14, letterSpacing:2, padding:14, marginBottom:10,
+                  style={{ width:'100%', fontSize:15, letterSpacing:2, padding:15, marginBottom:10,
                     background: pedido?.soloBebidas ? 'linear-gradient(135deg,var(--green),#1aad63)' : undefined }}
                   onClick={() => confirmarPedidoCliente(pedidoKey, pedido?.mesa)}>
                   {pedido?.soloBebidas ? '🥤 CONFIRMAR — BEBIDAS LISTAS' : '✅ CONFIRMAR — ENVIAR A COCINA'}
@@ -506,10 +539,10 @@ export default function Mesas() {
                   style={{ width:'100%', background:'rgba(255,77,77,.12)',
                     border:'1.5px solid var(--red)', color:'var(--red)',
                     borderRadius:12, padding:'13px 0', fontSize:14, fontWeight:800,
-                    cursor:'pointer', fontFamily:'var(--font)', letterSpacing:2, marginBottom:10 }}>
+                    cursor:'pointer', fontFamily:'var(--font)', letterSpacing:2, marginBottom:8 }}>
                   ❌ RECHAZAR PEDIDO
                 </button>
-                <button className="btn btn-ghost" style={{ width:'100%', padding:12 }}
+                <button className="btn btn-ghost" style={{ width:'100%', padding:11 }}
                   onClick={() => setConfirmandoCliente(null)}>Cerrar</button>
               </div>
             </div>
@@ -613,7 +646,11 @@ export default function Mesas() {
                       <input type="number" min="0" step="0.10"
                         placeholder="0.00"
                         value={pago.yape}
-                        onChange={e => setPago(p => ({ ...p, yape: e.target.value }))}
+                        onChange={e => {
+                          const yapeVal = parseFloat(e.target.value) || 0
+                          const resto   = Math.max(0, total - yapeVal)
+                          setPago({ yape: e.target.value, efectivo: resto > 0 ? resto.toFixed(2) : '' })
+                        }}
                         style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border)',
                           borderRadius:8, padding:'6px 8px', color:'white',
                           fontFamily:'var(--mono)', fontSize:15, fontWeight:700,
@@ -632,13 +669,6 @@ export default function Mesas() {
                       <input type="number" min="0" step="0.10"
                         placeholder={total.toFixed(2)}
                         value={pago.efectivo}
-                        onFocus={e => {
-                          // Si no hay nada ingresado aún, auto-rellenar con el total menos lo que ya está en Yape
-                          if (!pago.efectivo) {
-                            const resto = total - (parseFloat(pago.yape) || 0)
-                            if (resto > 0) setPago(p => ({ ...p, efectivo: resto.toFixed(2) }))
-                          }
-                        }}
                         onChange={e => setPago(p => ({ ...p, efectivo: e.target.value }))}
                         style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border)',
                           borderRadius:8, padding:'6px 8px', color:'white',
