@@ -692,20 +692,83 @@ export default function ClienteMesa() {
               <div style={{ padding:16 }}>
                 {(pedidoData?.items||[]).length === 0 ? (
                   <div style={{ textAlign:'center', color:'#8b949e', padding:'20px 0' }}>Sin pedidos aún</div>
-                ) : (pedidoData?.items||[]).map((item,i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between',
-                    alignItems:'center', padding:'8px 0',
-                    borderBottom: i < pedidoData.items.length-1 ? '1px solid #21262d':'none' }}>
-                    <div>
-                      <div style={{ fontWeight:600, fontSize:14, color:'#c9d1d9' }}>{item.name}</div>
-                      <div style={{ fontSize:12, color:'#8b949e', marginTop:2 }}>×{item.qty} · S/{item.price.toFixed(2)} c/u</div>
+                ) : (() => {
+                  // Fusionar items duplicados por name+price
+                  const merged = {}
+                  ;(pedidoData.items||[]).forEach(item => {
+                    const key = `${item.name}__${item.price}`
+                    if (merged[key]) merged[key] = { ...merged[key], qty: merged[key].qty + item.qty }
+                    else merged[key] = { ...item }
+                  })
+                  const items = Object.values(merged)
+                  const BEBIDAS = ['bebidas','bebida','drinks','drink']
+                  const bebidas  = items.filter(i => BEBIDAS.includes((i.category||'').toLowerCase().trim()))
+                  const comidas  = items.filter(i => !BEBIDAS.includes((i.category||'').toLowerCase().trim()))
+
+                  const renderItem = (item, i, arr, esBebida) => (
+                    <div key={i} style={{
+                      display:'flex', justifyContent:'space-between', alignItems:'flex-start',
+                      padding:'10px 12px', marginBottom:6, borderRadius:12,
+                      background: esBebida ? 'rgba(74,158,255,.07)' : 'rgba(255,255,255,.03)',
+                      border: `1px solid ${esBebida ? 'rgba(74,158,255,.2)' : '#21262d'}` }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <span style={{
+                            background: esBebida ? '#4a9eff' : '#f5a623',
+                            color:'#111', fontWeight:900, fontSize:11,
+                            width:24, height:24, borderRadius:'50%', flexShrink:0,
+                            display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            {item.qty}
+                          </span>
+                          <span style={{ fontWeight:700, fontSize:15,
+                            color: esBebida ? '#4a9eff' : '#c9d1d9' }}>
+                            {esBebida ? '🥤 ' : ''}{item.name}
+                          </span>
+                        </div>
+                        {item.nota && (
+                          <div style={{ fontSize:11, color:'#f5c842', marginTop:4, marginLeft:32,
+                            background:'rgba(245,200,66,.08)', borderRadius:6,
+                            padding:'2px 8px', display:'inline-block' }}>
+                            ✏️ {item.nota}
+                          </div>
+                        )}
+                        <div style={{ fontSize:12, color:'#8b949e', marginTop:3, marginLeft:32 }}>
+                          S/{Number(item.price).toFixed(2)} c/u
+                        </div>
+                      </div>
+                      <div style={{ fontFamily:'monospace', fontWeight:900, fontSize:16,
+                        color: esBebida ? '#4a9eff' : '#f5a623', flexShrink:0, marginLeft:12 }}>
+                        S/{(item.price*item.qty).toFixed(2)}
+                      </div>
                     </div>
-                    <div style={{ fontFamily:'monospace', fontWeight:800, fontSize:15, color:'#f5a623' }}>
-                      S/{(item.price*item.qty).toFixed(2)}
-                    </div>
-                  </div>
-                ))}
-                <div style={{ borderTop:'2px dashed #30363d', marginTop:14, paddingTop:14 }}>
+                  )
+
+                  return (
+                    <>
+                      {/* Comidas */}
+                      {comidas.length > 0 && (
+                        <div style={{ marginBottom:12 }}>
+                          {comidas.length > 0 && bebidas.length > 0 && (
+                            <div style={{ fontSize:10, fontWeight:800, letterSpacing:2,
+                              color:'#f5a623', textTransform:'uppercase', marginBottom:8 }}>🍽 Platos</div>
+                          )}
+                          {comidas.map((item,i) => renderItem(item, i, comidas, false))}
+                        </div>
+                      )}
+                      {/* Bebidas */}
+                      {bebidas.length > 0 && (
+                        <div style={{ marginBottom:12 }}>
+                          {comidas.length > 0 && (
+                            <div style={{ fontSize:10, fontWeight:800, letterSpacing:2,
+                              color:'#4a9eff', textTransform:'uppercase', marginBottom:8 }}>🥤 Bebidas</div>
+                          )}
+                          {bebidas.map((item,i) => renderItem(item, i, bebidas, true))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+                <div style={{ borderTop:'2px dashed #30363d', marginTop:8, paddingTop:14 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', fontWeight:900, fontSize:22 }}>
                     <span>TOTAL</span>
                     <span style={{ color:'#27c97a', fontFamily:'monospace' }}>S/{totalGeneral.toFixed(2)}</span>

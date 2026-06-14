@@ -13,6 +13,15 @@ export default function Mesas() {
   const [mesasActivas, setMesasActivas]   = useState(new Set())
   const [confirming, setConfirming]       = useState(null)
   const [confirmandoCliente, setConfirmandoCliente] = useState(null)
+  const [confirmandoIdx, setConfirmandoIdx]         = useState(0)
+
+  const abrirConfirmacion = (idx) => {
+    const lista = Object.entries(activeOrders).filter(([,o]) => o.status==='esperando_confirmacion')
+    if (lista[idx]) {
+      setConfirmandoIdx(idx)
+      setConfirmandoCliente(lista[idx])
+    }
+  }
   const [processing, setProcessing]       = useState(false)
   const [deletingKey, setDeletingKey]     = useState(null)
   const [confirmDeleteKey, setConfirmDeleteKey] = useState(null)
@@ -432,7 +441,7 @@ export default function Mesas() {
               <div style={{ color:'var(--muted)', fontSize:11 }}>Esperando tu confirmación</div>
             </div>
           </div>
-          <button onClick={() => setConfirmandoCliente(getPedidosEsperando()[0])}
+          <button onClick={() => abrirConfirmacion(0)}
             style={{ background:'var(--blue)', color:'white', border:'none',
               borderRadius:10, padding:'8px 14px', fontSize:12, fontWeight:800,
               cursor:'pointer', fontFamily:'var(--font)' }}>REVISAR</button>
@@ -618,8 +627,31 @@ export default function Mesas() {
                   </div>
                 </div>
                 {getPedidosEsperando().length > 1 && (
-                  <div style={{ fontSize:12, color:'var(--blue)', textAlign:'center', marginTop:10 }}>
-                    +{getPedidosEsperando().length-1} pedido(s) más esperando
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10 }}>
+                    <button
+                      disabled={confirmandoIdx === 0}
+                      onClick={() => abrirConfirmacion(confirmandoIdx - 1)}
+                      style={{ flex:1, padding:'9px 0', borderRadius:10, border:'1.5px solid var(--border)',
+                        background: confirmandoIdx === 0 ? 'transparent' : 'var(--card)',
+                        color: confirmandoIdx === 0 ? 'var(--border)' : 'var(--text)',
+                        fontWeight:800, fontSize:13, cursor: confirmandoIdx === 0 ? 'not-allowed' : 'pointer',
+                        fontFamily:'var(--font)' }}>
+                      ← Anterior
+                    </button>
+                    <div style={{ fontSize:12, color:'var(--muted)', textAlign:'center', flexShrink:0 }}>
+                      {confirmandoIdx + 1} / {getPedidosEsperando().length}
+                    </div>
+                    <button
+                      disabled={confirmandoIdx >= getPedidosEsperando().length - 1}
+                      onClick={() => abrirConfirmacion(confirmandoIdx + 1)}
+                      style={{ flex:1, padding:'9px 0', borderRadius:10, border:'1.5px solid var(--border)',
+                        background: confirmandoIdx >= getPedidosEsperando().length - 1 ? 'transparent' : 'var(--card)',
+                        color: confirmandoIdx >= getPedidosEsperando().length - 1 ? 'var(--border)' : 'var(--text)',
+                        fontWeight:800, fontSize:13,
+                        cursor: confirmandoIdx >= getPedidosEsperando().length - 1 ? 'not-allowed' : 'pointer',
+                        fontFamily:'var(--font)' }}>
+                      Siguiente →
+                    </button>
                   </div>
                 )}
               </div>
