@@ -11,6 +11,7 @@ export default function Config() {
   const [pins, setPins]   = useState({ mesero:'', cocina:'', dueno:'' })
   const [currentPin, setCurrentPin] = useState('')
   const [whatsapp, setWhatsapp]     = useState('')
+  const [descuentoActivo, setDescuentoActivo] = useState(true)
   const [repartidores, setRepartidores] = useState([])
   const [nuevoRep, setNuevoRep] = useState({ nombre:'', celular:'', pin:'' })
   const [saving, setSaving]   = useState(false)
@@ -29,7 +30,10 @@ export default function Config() {
         setRepartidores(d.repartidores || [])
       }
       const restoSnap = await getDoc(doc(db, 'restaurantes', restoId))
-      if (restoSnap.exists()) setWhatsapp(restoSnap.data().whatsapp || '')
+      if (restoSnap.exists()) {
+        setWhatsapp(restoSnap.data().whatsapp || '')
+        setDescuentoActivo(restoSnap.data().descuentoActivo !== false) // default true
+      }
     } catch {}
     setLoading(false)
   }
@@ -104,8 +108,8 @@ export default function Config() {
         <span className="page-title">CONFIGURACIÓN</span>
       </div>
 
-      <div style={{ display:'flex', borderBottom:'1px solid var(--border)' }}>
-        {[['pines','🔑 PINs'],['whatsapp','📱 WhatsApp'],['repartidores','🛵 Repartidores']].map(([t,l]) => (
+      <div style={{ display:'flex', borderBottom:'1px solid var(--border)', flexWrap:'wrap' }}>
+        {[['pines','🔑 PINs'],['whatsapp','📱 WhatsApp'],['repartidores','🛵 Repartidores'],['general','⚙️ General']].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex:1, padding:'12px 0', background:'none', border:'none',
             borderBottom: tab===t ? '2px solid var(--accent)' : '2px solid transparent',
@@ -220,6 +224,47 @@ export default function Config() {
       )}
 
       {/* Modal confirmar eliminar repartidor */}
+      {/* General */}
+      {tab === 'general' && (
+        <div style={{ padding:20 }}>
+          <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2,
+            textTransform:'uppercase', marginBottom:16 }}>Opciones de cobro</div>
+
+          {/* Toggle descuento */}
+          <div style={{ background:'var(--card)', border:'1.5px solid var(--border)',
+            borderRadius:14, padding:'16px 18px', marginBottom:12 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:14 }}>Descuentos en cobro</div>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:3, lineHeight:1.5 }}>
+                  Muestra la sección de descuento al cobrar una mesa
+                </div>
+              </div>
+              <div onClick={async () => {
+                const nuevo = !descuentoActivo
+                setDescuentoActivo(nuevo)
+                await updateDoc(doc(db, 'restaurantes', restoId), { descuentoActivo: nuevo })
+                showToast(nuevo ? '✅ Descuentos activados' : '🚫 Descuentos desactivados')
+              }} style={{
+                width:48, height:26, borderRadius:13, cursor:'pointer', flexShrink:0,
+                background: descuentoActivo ? 'var(--accent)' : 'var(--border)',
+                position:'relative', transition:'background .2s' }}>
+                <div style={{
+                  position:'absolute', top:3,
+                  left: descuentoActivo ? 25 : 3,
+                  width:20, height:20, borderRadius:'50%',
+                  background:'white', transition:'left .2s' }} />
+              </div>
+            </div>
+            <div style={{ marginTop:10, fontSize:11, padding:'6px 10px', borderRadius:8,
+              background: descuentoActivo ? 'rgba(39,201,122,.08)' : 'rgba(255,77,77,.08)',
+              color: descuentoActivo ? 'var(--green)' : 'var(--red)', fontWeight:700 }}>
+              {descuentoActivo ? '✅ Visible en el cobro' : '🚫 Oculto en el cobro'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmEliminarId && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)',
           zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>

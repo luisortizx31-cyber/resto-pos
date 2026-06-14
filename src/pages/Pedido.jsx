@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { db, rtdb } from '../lib/firebase'
-import { collection, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore'
 import { ref, push } from 'firebase/database'
 import { useToast, useSession } from '../components/Layout'
 import { esSoloBebidas } from '../lib/utils'
@@ -112,16 +112,35 @@ export default function Pedido() {
         timeISO:     new Date().toISOString(),
       })
 
-      // Actualizar también el pedido Firestore para que el cliente vea el total
+      // Sincronizar con Firestore para que el cliente vea el total en tiempo real
       try {
         const mesaDocRef = doc(db, 'restaurantes', restoId, 'mesas', String(mesa))
         const mesaSnap   = await getDoc(mesaDocRef)
-        if (mesaSnap.exists() && mesaSnap.data().pedidoActivoId) {
-          const pedidoId  = mesaSnap.data().pedidoActivoId
-          const pedRef    = doc(db, 'restaurantes', restoId, 'pedidos', pedidoId)
-          const pedSnap   = await getDoc(pedRef)
+        const mesaData   = mesaSnap.exists() ? mesaSnap.data() : {}
+
+        let pedidoId = mesaData.pedidoActivoId || null
+
+        if (!pedidoId) {
+          // El cliente aún no escaneó: crear el doc de pedido y enlazarlo a la mesa
+          pedidoId = `mesa${mesa}_${Date.now()}`
+          const pedRef = doc(db, 'restaurantes', restoId, 'pedidos', pedidoId)
+          await setDoc(pedRef, {
+            restoId,
+            mesa: parseInt(mesa),
+            estado: 'activo',
+            items: [...itemsArr],
+            creadoEn: new Date().toISOString(),
+          })
+          await setDoc(mesaDocRef, {
+            estado: 'ocupada',
+            pedidoActivoId: pedidoId,
+            desde: mesaData.desde || new Date().toISOString(),
+          }, { merge: true })
+        } else {
+          // Ya existe el pedido: fusionar items
+          const pedRef   = doc(db, 'restaurantes', restoId, 'pedidos', pedidoId)
+          const pedSnap  = await getDoc(pedRef)
           const prevItems = pedSnap.exists() ? (pedSnap.data().items || []) : []
-          // Fusionar items nuevos con los existentes (por name+price)
           const merged = [...prevItems]
           itemsArr.forEach(newItem => {
             const idx = merged.findIndex(i =>

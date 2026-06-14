@@ -17,6 +17,14 @@ export default function Mesas() {
   const [deletingKey, setDeletingKey]     = useState(null)
   const [confirmDeleteKey, setConfirmDeleteKey] = useState(null)
   const [descuento, setDescuento]         = useState({ tipo:'pct', valor:'' })
+  const [descuentoActivo, setDescuentoActivo] = useState(true)
+
+  useEffect(() => {
+    if (!restoId) return
+    getDoc(doc(db, 'restaurantes', restoId)).then(snap => {
+      if (snap.exists()) setDescuentoActivo(snap.data().descuentoActivo !== false)
+    })
+  }, [restoId])
   const [pago, setPago]                   = useState({ yape: '', efectivo: '' }) // montos por método
   const [itemsEntregados, setItemsEntregados] = useState({}) // { 'nombre__precio': true }
 
@@ -741,6 +749,7 @@ export default function Mesas() {
                   ))}
                 </div>
               )}
+              {descuentoActivo && (
               <div style={{ background:'var(--surface)', borderRadius:12, padding:12, marginBottom:12 }}>
                 <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2, textTransform:'uppercase', marginBottom:8 }}>🏷 Descuento</div>
                 <div style={{ display:'flex', gap:8, marginBottom:8 }}>
@@ -757,6 +766,7 @@ export default function Mesas() {
                   placeholder={descuento.tipo==='pct'?'Ej: 10 (10%)':'Ej: 5 (S/5)'}
                   value={descuento.valor} onChange={e => setDescuento(d => ({ ...d, valor:e.target.value }))} />
               </div>
+              )}
               <div style={{ background:'var(--surface)', borderRadius:12, padding:14, marginBottom:16 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--muted)', marginBottom:6 }}>
                   <span>Subtotal</span><span style={{ fontFamily:'var(--mono)' }}>S/{bruto.toFixed(2)}</span>

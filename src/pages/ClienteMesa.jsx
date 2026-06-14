@@ -847,7 +847,7 @@ export default function ClienteMesa() {
                           {!tieneVariantes && (
                             <div style={{ color: disabled ? '#8b949e' : '#f5a623',
                               fontWeight:800, fontSize:14, fontFamily:'monospace', marginTop:2 }}>
-                              S/ {item.price}.00
+                              S/ {Number(item.price).toFixed(2)}
                             </div>
                           )}
                         </div>
