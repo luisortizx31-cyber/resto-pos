@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { db, rtdb } from '../lib/firebase'
-import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { ref, push } from 'firebase/database'
 import { useToast, useSession } from '../components/Layout'
 import { esSoloBebidas } from '../lib/utils'
@@ -41,6 +41,18 @@ export default function Pedido() {
           if (!byCategory[data.category]) byCategory[data.category] = []
           byCategory[data.category].push({ id:d.id, ...data })
         })
+        // Respetar orden de categorías guardado en config
+        try {
+          const catSnap = await getDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias'))
+          if (catSnap.exists() && catSnap.data().lista?.length) {
+            const orden = catSnap.data().lista
+            const sorted = {}
+            orden.forEach(cat => { if (byCategory[cat]) sorted[cat] = byCategory[cat] })
+            Object.keys(byCategory).forEach(cat => { if (!sorted[cat]) sorted[cat] = byCategory[cat] })
+            setMenu(Object.keys(sorted).length ? sorted : DEFAULT_MENU)
+            return
+          }
+        } catch {}
         setMenu(Object.keys(byCategory).length ? byCategory : DEFAULT_MENU)
       } catch { setMenu(DEFAULT_MENU) }
     }
@@ -90,7 +102,7 @@ export default function Pedido() {
         nota:     v.nota?.trim() || '',
       }))
       const soloBebidas = esSoloBebidas(itemsArr)
-      await push(ref(rtdb, `${restoId}/pedidos_activos`), {
+      const rtdbKey = await push(ref(rtdb, `${restoId}/pedidos_activos`), {
         mesa:        parseInt(mesa),
         items:       itemsArr,
         extras:      extras.trim(),
@@ -99,6 +111,28 @@ export default function Pedido() {
         soloBebidas,
         timeISO:     new Date().toISOString(),
       })
+
+      // Actualizar también el pedido Firestore para que el cliente vea el total
+      try {
+        const mesaDocRef = doc(db, 'restaurantes', restoId, 'mesas', String(mesa))
+        const mesaSnap   = await getDoc(mesaDocRef)
+        if (mesaSnap.exists() && mesaSnap.data().pedidoActivoId) {
+          const pedidoId  = mesaSnap.data().pedidoActivoId
+          const pedRef    = doc(db, 'restaurantes', restoId, 'pedidos', pedidoId)
+          const pedSnap   = await getDoc(pedRef)
+          const prevItems = pedSnap.exists() ? (pedSnap.data().items || []) : []
+          // Fusionar items nuevos con los existentes (por name+price)
+          const merged = [...prevItems]
+          itemsArr.forEach(newItem => {
+            const idx = merged.findIndex(i =>
+              i.name === newItem.name && Number(i.price) === Number(newItem.price)
+            )
+            if (idx >= 0) merged[idx] = { ...merged[idx], qty: merged[idx].qty + newItem.qty }
+            else merged.push(newItem)
+          })
+          await updateDoc(pedRef, { items: merged })
+        }
+      } catch (e) { console.error('Firestore sync error', e) }
       showToast(`✅ Pedido enviado — Mesa ${mesa}`)
       navigate('/mesas')
     } catch { showToast('Error al enviar', 'error') }

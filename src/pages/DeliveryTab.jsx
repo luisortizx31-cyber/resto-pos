@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { rtdb, db } from '../lib/firebase'
 import { ref, onValue, update, remove } from 'firebase/database'
-import { doc, getDoc, writeBatch, collection, getDocs } from 'firebase/firestore'
+import { doc, getDoc, setDoc, collection, getDocs, onSnapshot } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
 
 // ── Timer idéntico al del Repartidor ────────────────────────────────
@@ -175,8 +175,48 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
     showToast(repartidor === 'otro' ? '✅ Asignado a repartidor externo' : `✅ Asignado a ${repartidor.nombre}`)
   }
 
+  const guardarEnHistorial = async (pedido) => {
+    const entregadoISO = pedido.entregadoISO || new Date().toISOString()
+    const total = pedido.total ?? (pedido.items || []).reduce((a, i) => a + i.price * i.qty, 0)
+    const histRef = doc(collection(db, 'restaurantes', restoId, 'historial'))
+    await setDoc(histRef, {
+      tipo:               'delivery',
+      cliente:            pedido.nombre      || '',
+      clienteNombre:      pedido.nombre      || '',
+      clienteDireccion:   pedido.direccion   || '',
+      telefono:           pedido.telefono    || '',
+      direccion:          pedido.direccion   || '',
+      items:              pedido.items       || [],
+      extras:             pedido.extras      || '',
+      extrasPrice:        pedido.extrasPrice || 0,
+      totalFinal:         total,
+      pagoYape:           pedido.pagoYape    || 0,
+      pagoEfectivo:       pedido.pagoEfectivo|| 0,
+      clientePago:        pedido.clientePago || '',
+      repartidorNombre:   pedido.repartidorNombre   || '',
+      repartidorAnterior: pedido.repartidorAnterior || null,
+      completedAtISO:     entregadoISO,
+      creadoISO:          pedido.timeISO     || entregadoISO,
+    })
+  }
+
   const toggleDinero = async (key, actual) => {
-    await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), { dineroEntregado: !actual })
+    const pedido = pedidos.find(p => p.key === key)
+    const nuevoValor = !actual
+    await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), { dineroEntregado: nuevoValor })
+    // Solo guardar en historial cuando el repartidor PAGA (toggle ON)
+    if (nuevoValor && pedido) {
+      try { await guardarEnHistorial(pedido) } catch (e) { console.error(e) }
+    }
+  }
+
+  const todosPagaron = async () => {
+    const pendientes = entregados.filter(p => !p.dineroEntregado && p.repartidorId !== 'otro')
+    for (const pedido of pendientes) {
+      await update(ref(rtdb, `${restoId}/delivery_pedidos/${pedido.key}`), { dineroEntregado: true })
+      try { await guardarEnHistorial(pedido) } catch (e) { console.error(e) }
+    }
+    showToast(`✅ ${pendientes.length} repartidor(es) marcados como pagados`)
   }
 
   const marcarEntregadoCocina = async (key) => {
@@ -184,34 +224,14 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
       const pedido = pedidos.find(p => p.key === key)
       const entregadoISO = new Date().toISOString()
 
-      // Marcar entregado en RTDB
       await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), {
         status: 'entregado',
         entregadoISO,
       })
 
-      // Guardar en historial Firestore
-      if (pedido) {
-        const total = pedido.total ?? (pedido.items || []).reduce((a, i) => a + i.price * i.qty, 0)
-        const batch = writeBatch(db)
-        const histRef = doc(collection(db, 'restaurantes', restoId, 'historial'))
-        batch.set(histRef, {
-          tipo:             'delivery',
-          cliente:          pedido.nombre    || '',
-          telefono:         pedido.telefono  || '',
-          direccion:        pedido.direccion || '',
-          items:            pedido.items     || [],
-          extras:           pedido.extras    || '',
-          extrasPrice:      pedido.extrasPrice || 0,
-          totalFinal:       total,
-          pagoYape:         pedido.pagoYape       || 0,
-          pagoEfectivo:     pedido.pagoEfectivo   || 0,
-          repartidorNombre: pedido.repartidorNombre || '',
-          repartidorAnterior: pedido.repartidorAnterior || null,
-          completedAtISO:   entregadoISO,
-          creadoISO:        pedido.timeISO || entregadoISO,
-        })
-        await batch.commit()
+      // Si es repartidor "Otro" → guardar en historial directo sin esperar toggle
+      if (pedido && (pedido.repartidorId === 'otro' || !pedido.repartidorId)) {
+        try { await guardarEnHistorial({ ...pedido, entregadoISO }) } catch (e) { console.error(e) }
       }
 
       setConfirmEntregado(null)
@@ -611,14 +631,23 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
         ))}
       </div>
 
-      {/* Botón limpiar entregados — solo en tab entregados y para admin */}
+      {/* Botón limpiar entregados y todos pagaron — solo en tab entregados y para admin */}
       {tab === 'entregados' && esRolAdmin && entregados.length > 0 && (
-        <div style={{ padding:'10px 16px 0' }}>
+        <div style={{ padding:'10px 16px 0', display:'flex', gap:8 }}>
+          {/* Todos pagaron — solo si hay repartidores propios sin pagar */}
+          {entregados.some(p => !p.dineroEntregado && p.repartidorId !== 'otro') && (
+            <button onClick={todosPagaron}
+              style={{ flex:1, background:'rgba(39,201,122,.1)', border:'1px solid rgba(39,201,122,.4)',
+                color:'var(--green)', borderRadius:10, padding:'9px 12px', fontSize:12,
+                fontWeight:800, cursor:'pointer', fontFamily:'var(--font)', letterSpacing:1 }}>
+              💰 TODOS PAGARON
+            </button>
+          )}
           <button onClick={() => setConfirmLimpiar(true)}
-            style={{ background:'rgba(255,77,77,.08)', border:'1px solid rgba(255,77,77,.3)',
-              color:'var(--red)', borderRadius:10, padding:'9px 16px', fontSize:12,
+            style={{ flex:1, background:'rgba(255,77,77,.08)', border:'1px solid rgba(255,77,77,.3)',
+              color:'var(--red)', borderRadius:10, padding:'9px 12px', fontSize:12,
               fontWeight:800, cursor:'pointer', fontFamily:'var(--font)', letterSpacing:1 }}>
-            🗑 Limpiar entregados ({entregados.length})
+            🗑 LIMPIAR
           </button>
         </div>
       )}

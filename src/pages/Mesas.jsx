@@ -18,6 +18,24 @@ export default function Mesas() {
   const [confirmDeleteKey, setConfirmDeleteKey] = useState(null)
   const [descuento, setDescuento]         = useState({ tipo:'pct', valor:'' })
   const [pago, setPago]                   = useState({ yape: '', efectivo: '' }) // montos por método
+  const [itemsEntregados, setItemsEntregados] = useState({}) // { 'nombre__precio': true }
+
+  // Cargar checks guardados cuando se abre el modal de cobro
+  useEffect(() => {
+    if (confirming) {
+      const saved = localStorage.getItem(`gastro_check_mesa_${confirming.num}`)
+      setItemsEntregados(saved ? JSON.parse(saved) : {})
+    }
+  }, [confirming?.num])
+
+  // Guardar checks en localStorage cada vez que cambian
+  const toggleItemEntregado = (itemKey, mesaNum) => {
+    setItemsEntregados(prev => {
+      const nuevo = { ...prev, [itemKey]: !prev[itemKey] }
+      localStorage.setItem(`gastro_check_mesa_${mesaNum}`, JSON.stringify(nuevo))
+      return nuevo
+    })
+  }
   const [comprobante, setComprobante]     = useState(null)
   const [numMesas, setNumMesas]           = useState(10)
   const [editandoMesas, setEditandoMesas] = useState(false)
@@ -144,8 +162,78 @@ export default function Mesas() {
     setConfirming(null)
   }
 
-  const eliminarPedido = async (key) => {
-    setConfirmDeleteKey(key)
+  const eliminarItemDeCobro = async (itemName, itemPrice, itemQty) => {
+    if (!confirming) return
+    const mesaNum = confirming.num
+
+    // Si qty > 1 preguntar cuántos eliminar
+    let cantEliminar = itemQty
+    if (itemQty > 1) {
+      const resp = window.confirm(
+        `"${itemName}" tiene ${itemQty} unidades.\n\nOK = eliminar TODAS\nCancelar = eliminar solo 1`
+      )
+      cantEliminar = resp ? itemQty : 1
+    }
+
+    // Actualizar cada pedido RTDB y Firestore
+    const newOrders = []
+    for (const [key, order] of confirming.orders) {
+      let items = [...(order.items || [])]
+      let restante = cantEliminar
+
+      items = items.map(i => {
+        if (i.name === itemName && Number(i.price) === Number(itemPrice) && restante > 0) {
+          const quitar = Math.min(i.qty, restante)
+          restante -= quitar
+          return { ...i, qty: i.qty - quitar }
+        }
+        return i
+      }).filter(i => i.qty > 0)
+
+      // Actualizar RTDB
+      await update(ref(rtdb, `${restoId}/pedidos_activos/${key}`), { items })
+      newOrders.push([key, { ...order, items }])
+    }
+
+    // Actualizar Firestore pedido activo de la mesa
+    try {
+      const mesaDocRef = doc(db, 'restaurantes', restoId, 'mesas', String(mesaNum))
+      const mesaSnap = await getDoc(mesaDocRef)
+      if (mesaSnap.exists() && mesaSnap.data().pedidoActivoId) {
+        const pedidoId = mesaSnap.data().pedidoActivoId
+        const pedRef = doc(db, 'restaurantes', restoId, 'pedidos', pedidoId)
+        const pedSnap = await getDoc(pedRef)
+        if (pedSnap.exists()) {
+          let fsItems = [...(pedSnap.data().items || [])]
+          let restante = cantEliminar
+          fsItems = fsItems.map(i => {
+            if (i.name === itemName && Number(i.price) === Number(itemPrice) && restante > 0) {
+              const quitar = Math.min(i.qty, restante)
+              restante -= quitar
+              return { ...i, qty: i.qty - quitar }
+            }
+            return i
+          }).filter(i => i.qty > 0)
+          await updateDoc(pedRef, { items: fsItems })
+        }
+      }
+    } catch (e) { console.error(e) }
+
+    // Limpiar check del item eliminado
+    const itemKey = `${itemName}__${itemPrice}`
+    toggleItemEntregado(itemKey + '__removed', mesaNum)
+    localStorage.removeItem(`gastro_check_mesa_${mesaNum}`)
+    setItemsEntregados({})
+
+    // Recalcular total con nuevos orders
+    const { total } = calcTotal(newOrders, descuento)
+    const yapeVal = parseFloat(pago.yape) || 0
+    const resto = Math.max(0, total - yapeVal)
+    setPago(p => ({ ...p, efectivo: resto > 0 ? resto.toFixed(2) : '' }))
+
+    // Actualizar confirming con los nuevos orders
+    setConfirming(prev => ({ ...prev, orders: newOrders }))
+    showToast(`🗑 "${itemName}" eliminado del pedido`)
   }
 
   const eliminarPedidoConfirmado = async () => {
@@ -272,6 +360,8 @@ export default function Mesas() {
         hora: fmt12(new Date().toISOString()) })
       setConfirming(null)
       setPago({ yape:'', efectivo:'' })
+      // Limpiar checks de la mesa al cobrar
+      localStorage.removeItem(`gastro_check_mesa_${confirming.num}`)
     } catch { showToast('Error al cobrar','error') }
     setProcessing(false)
   }
@@ -569,20 +659,72 @@ export default function Mesas() {
               </div>
               <div style={{ background:'var(--surface)', borderRadius:12, padding:12, marginBottom:10 }}>
                 <div style={{ fontSize:11, color:'var(--blue)', fontWeight:800, letterSpacing:1, marginBottom:8 }}>RESUMEN</div>
-                {merged.map((item,i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between',
-                    fontSize:13, padding:'4px 0',
-                    borderBottom:i<merged.length-1?'1px solid var(--border)':'none',
-                    color:'var(--muted2)' }}>
-                    <span>×{item.qty} {item.name}</span>
-                    <span style={{ fontFamily:'var(--mono)' }}>S/{(item.price*item.qty).toFixed(2)}</span>
-                  </div>
-                ))}
+                {merged.map((item, i) => {
+                  const esBebida = ['bebidas','bebida','drinks','drink'].includes((item.category||'').toLowerCase().trim())
+                  const itemKey  = `${item.name}__${item.price}`
+                  const entregado = itemsEntregados[itemKey] || false
+                  return (
+                    <div key={i} onClick={() => toggleItemEntregado(itemKey, confirming.num)}
+                      style={{
+                        display:'flex', justifyContent:'space-between', alignItems:'center',
+                        fontSize:13, padding:'7px 8px', marginBottom:2, borderRadius:8, cursor:'pointer',
+                        background: entregado ? 'rgba(255,255,255,.03)' : esBebida ? 'rgba(74,158,255,.08)' : 'none',
+                        border: esBebida && !entregado ? '1px solid rgba(74,158,255,.2)' : '1px solid transparent',
+                        transition:'all .15s',
+                        opacity: entregado ? 0.5 : 1,
+                      }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flex:1 }}>
+                        {/* Checkbox */}
+                        <div style={{
+                          width:18, height:18, borderRadius:5, flexShrink:0,
+                          border: `2px solid ${entregado ? 'var(--green)' : esBebida ? '#4a9eff' : 'var(--border)'}`,
+                          background: entregado ? 'var(--green)' : 'transparent',
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          transition:'all .15s' }}>
+                          {entregado && <span style={{ color:'#111', fontSize:11, fontWeight:900 }}>✓</span>}
+                        </div>
+                        <span style={{
+                          textDecoration: entregado ? 'line-through' : 'none',
+                          color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--muted2)',
+                          fontWeight: esBebida ? 700 : 400 }}>
+                          {esBebida && !entregado && '🥤 '}×{item.qty} {item.name}
+                          {!esBebida && !entregado && `×${item.qty} ${item.name}`}
+                          {entregado && `×${item.qty} ${item.name}`}
+                        </span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{
+                          fontFamily:'var(--mono)', flexShrink:0,
+                          color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--muted2)',
+                          textDecoration: entregado ? 'line-through' : 'none' }}>
+                          S/{(item.price*item.qty).toFixed(2)}
+                        </span>
+                        {/* Botón eliminar — solo cuando está marcado */}
+                        {entregado && (
+                          <button
+                            onClick={e => { e.stopPropagation(); eliminarItemDeCobro(item.name, item.price, item.qty) }}
+                            style={{ background:'rgba(255,77,77,.15)', border:'1px solid rgba(255,77,77,.4)',
+                              color:'var(--red)', borderRadius:8, padding:'3px 8px',
+                              fontSize:12, cursor:'pointer', fontWeight:800, flexShrink:0 }}>
+                            🗑
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
                 {confirming.orders.filter(([,o])=>o.extras).map(([k,o]) => (
                   <div key={k} style={{ fontSize:12, color:'var(--yellow)', marginTop:6 }}>
                     ⭐ {o.extras}{o.extrasPrice>0?` S/${Number(o.extrasPrice).toFixed(2)}`:''}
                   </div>
                 ))}
+                {/* Contador de entregados */}
+                {Object.values(itemsEntregados).some(Boolean) && (
+                  <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)',
+                    fontSize:11, color:'var(--green)', fontWeight:700 }}>
+                    ✅ {Object.values(itemsEntregados).filter(Boolean).length} de {merged.length} platos entregados
+                  </div>
+                )}
               </div>
               {confirming.orders.length > 1 && (
                 <div style={{ background:'var(--surface)', borderRadius:12, padding:10, marginBottom:10 }}>
