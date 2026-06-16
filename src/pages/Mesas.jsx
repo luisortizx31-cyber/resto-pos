@@ -545,7 +545,15 @@ export default function Mesas() {
       {confirmandoCliente && (() => {
         const pedido = confirmandoCliente[1]
         const pedidoKey = confirmandoCliente[0]
-        const pedidoItems = pedido?.items || []
+        // Fusionar items duplicados por name+price antes de mostrar
+        const rawItems = pedido?.items || []
+        const mergedMap = {}
+        rawItems.forEach(item => {
+          const key = `${item.name}__${item.price}`
+          if (mergedMap[key]) mergedMap[key] = { ...mergedMap[key], qty: mergedMap[key].qty + item.qty }
+          else mergedMap[key] = { ...item }
+        })
+        const pedidoItems = Object.values(mergedMap)
         const pedidoTotal = pedidoItems.reduce((a,i) => a+i.price*i.qty, 0) + (pedido?.extrasPrice||0)
         return (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)',
@@ -587,44 +595,84 @@ export default function Mesas() {
               {/* Items — scrolleable */}
               <div style={{ overflowY:'auto', flex:1, padding:'16px 22px 8px' }}>
                 <div style={{ background:'var(--surface)', borderRadius:12, padding:12 }}>
-                  {pedidoItems.map((item,i) => (
-                    <div key={i} style={{ padding:'8px 0',
-                      borderBottom:i<pedidoItems.length-1?'1px solid var(--border)':'none' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between',
-                        fontSize:14, color:'var(--muted2)' }}>
-                        <span style={{ fontWeight:700 }}>×{item.qty} {item.name}</span>
-                        <span style={{ fontFamily:'var(--mono)', fontWeight:700 }}>
-                          S/{(item.price*item.qty).toFixed(2)}
-                        </span>
-                      </div>
-                      {item.nota && (
-                        <div style={{ fontSize:11, color:'var(--yellow)', marginTop:3,
-                          background:'rgba(245,200,66,.08)', borderRadius:6,
-                          padding:'2px 8px', display:'inline-block' }}>
-                          ✏️ {item.nota}
+                  {(() => {
+                    const BEBIDAS = ['bebidas','bebida','drinks','drink']
+                    const bebidas = pedidoItems.filter(i => BEBIDAS.includes((i.category||'').toLowerCase().trim()))
+                    const comidas = pedidoItems.filter(i => !BEBIDAS.includes((i.category||'').toLowerCase().trim()))
+
+                    const renderItem = (item, i, esBebida) => (
+                      <div key={i} style={{
+                        display:'flex', justifyContent:'space-between', alignItems:'flex-start',
+                        padding:'9px 10px', marginBottom:6, borderRadius:10,
+                        background: esBebida ? 'rgba(74,158,255,.08)' : 'rgba(255,255,255,.03)',
+                        border:`1px solid ${esBebida ? 'rgba(74,158,255,.25)' : 'var(--border)'}` }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{
+                              background: esBebida ? '#4a9eff' : 'var(--accent)',
+                              color:'#111', fontWeight:900, fontSize:12,
+                              width:26, height:26, borderRadius:'50%', flexShrink:0,
+                              display:'flex', alignItems:'center', justifyContent:'center' }}>
+                              {item.qty}
+                            </span>
+                            <span style={{ fontWeight:700, fontSize:15,
+                              color: esBebida ? '#4a9eff' : 'var(--text)' }}>
+                              {esBebida ? '🥤 ' : ''}{item.name}
+                            </span>
+                          </div>
+                          {item.nota && (
+                            <div style={{ fontSize:11, color:'var(--yellow)', marginTop:4, marginLeft:34,
+                              background:'rgba(245,200,66,.08)', borderRadius:6,
+                              padding:'2px 8px', display:'inline-block' }}>
+                              ✏️ {item.nota}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                  {pedido?.extras && (
-                    <div style={{ marginTop:8, fontSize:12, color:'var(--yellow)',
-                      paddingTop:8, borderTop:'1px solid var(--border)' }}>
-                      📝 {pedido.extras}
-                      {pedido.extrasPrice > 0 && (
-                        <span style={{ float:'right', fontFamily:'var(--mono)', fontWeight:700 }}>
-                          S/{Number(pedido.extrasPrice).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div style={{ display:'flex', justifyContent:'space-between',
-                    fontWeight:800, fontSize:17, marginTop:10,
-                    paddingTop:8, borderTop:'2px solid var(--border)' }}>
-                    <span>Total</span>
-                    <span style={{ color:'var(--green)', fontFamily:'var(--mono)' }}>
-                      S/{pedidoTotal.toFixed(2)}
-                    </span>
-                  </div>
+                        <div style={{ fontFamily:'var(--mono)', fontWeight:800, fontSize:15,
+                          color: esBebida ? '#4a9eff' : 'var(--accent)', flexShrink:0, marginLeft:8 }}>
+                          S/{(item.price*item.qty).toFixed(2)}
+                        </div>
+                      </div>
+                    )
+
+                    return (
+                      <>
+                        {comidas.length > 0 && bebidas.length > 0 && (
+                          <div style={{ fontSize:10, fontWeight:800, letterSpacing:2,
+                            color:'var(--accent)', textTransform:'uppercase', marginBottom:8 }}>🍽 Platos</div>
+                        )}
+                        {comidas.map((item,i) => renderItem(item, i, false))}
+                        {bebidas.length > 0 && (
+                          <>
+                            <div style={{ fontSize:10, fontWeight:800, letterSpacing:2,
+                              color:'#4a9eff', textTransform:'uppercase',
+                              marginTop: comidas.length > 0 ? 10 : 0, marginBottom:8 }}>🥤 Bebidas</div>
+                            {bebidas.map((item,i) => renderItem(item, i, true))}
+                          </>
+                        )}
+                        {pedido?.extras && (
+                          <div style={{ marginTop:8, fontSize:12, color:'var(--yellow)',
+                            paddingTop:8, borderTop:'1px solid var(--border)',
+                            display:'flex', justifyContent:'space-between' }}>
+                            <span>📝 {pedido.extras}</span>
+                            {pedido.extrasPrice > 0 && (
+                              <span style={{ fontFamily:'var(--mono)', fontWeight:700 }}>
+                                S/{Number(pedido.extrasPrice).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div style={{ display:'flex', justifyContent:'space-between',
+                          fontWeight:900, fontSize:18, marginTop:10,
+                          paddingTop:10, borderTop:'2px solid var(--border)' }}>
+                          <span>Total</span>
+                          <span style={{ color:'var(--green)', fontFamily:'var(--mono)' }}>
+                            S/{pedidoTotal.toFixed(2)}
+                          </span>
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
                 {getPedidosEsperando().length > 1 && (
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10 }}>
@@ -766,21 +814,6 @@ export default function Mesas() {
                   </div>
                 )}
               </div>
-              {confirming.orders.length > 1 && (
-                <div style={{ background:'var(--surface)', borderRadius:12, padding:10, marginBottom:10 }}>
-                  {confirming.orders.map(([key,order],oi) => (
-                    <div key={key} style={{ display:'flex', justifyContent:'space-between',
-                      alignItems:'center', padding:'4px 0' }}>
-                      <span style={{ fontSize:11, color:'var(--muted)' }}>
-                        {oi===0?'1er':`${oi+1}°`} pedido · {fmt12(order.timeISO)}
-                      </span>
-                      <button onClick={() => eliminarPedido(key)} disabled={deletingKey===key}
-                        style={{ background:'none', border:'none', color:'var(--red)',
-                          fontSize:16, cursor:'pointer', padding:'0 4px' }}>🗑</button>
-                    </div>
-                  ))}
-                </div>
-              )}
               {descuentoActivo && (
               <div style={{ background:'var(--surface)', borderRadius:12, padding:12, marginBottom:12 }}>
                 <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2, textTransform:'uppercase', marginBottom:8 }}>🏷 Descuento</div>
