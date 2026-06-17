@@ -37,8 +37,13 @@ export default function Mesas() {
   const [pago, setPago]                   = useState({ yape: '', efectivo: '' }) // montos por método
   const [itemsEntregados, setItemsEntregados] = useState({}) // { 'nombre__precio': true }
 
-  // Cargar checks guardados cuando se abre el modal de cobro
+  // Auto-llenar efectivo cuando se abre el modal de cobro
   useEffect(() => {
+    if (confirming) {
+      const { total } = calcTotal(confirming.orders, descuento)
+      setPago(p => ({ ...p, efectivo: p.efectivo || total.toFixed(2) }))
+    }
+  }, [confirming?.num])
     if (confirming) {
       const saved = localStorage.getItem(`gastro_check_mesa_${confirming.num}`)
       setItemsEntregados(saved ? JSON.parse(saved) : {})
@@ -745,8 +750,10 @@ export default function Mesas() {
               <div style={{ fontWeight:800, fontSize:20, textAlign:'center', marginBottom:16 }}>
                 Cobrar Mesa {confirming.num}
               </div>
-              <div style={{ background:'var(--surface)', borderRadius:12, padding:12, marginBottom:10 }}>
-                <div style={{ fontSize:11, color:'var(--blue)', fontWeight:800, letterSpacing:1, marginBottom:8 }}>RESUMEN</div>
+              <div style={{ background:'var(--surface)', borderRadius:14, padding:14, marginBottom:10 }}>
+                <div style={{ fontSize:11, color:'var(--blue)', fontWeight:900,
+                  letterSpacing:2, marginBottom:12, textTransform:'uppercase',
+                  borderBottom:'1px solid var(--border)', paddingBottom:8 }}>📋 RESUMEN</div>
                 {merged.map((item, i) => {
                   const esBebida = ['bebidas','bebida','drinks','drink'].includes((item.category||'').toLowerCase().trim())
                   const itemKey  = `${item.name}__${item.price}`
@@ -755,47 +762,55 @@ export default function Mesas() {
                     <div key={i} onClick={() => toggleItemEntregado(itemKey, confirming.num)}
                       style={{
                         display:'flex', justifyContent:'space-between', alignItems:'center',
-                        fontSize:13, padding:'7px 8px', marginBottom:2, borderRadius:8, cursor:'pointer',
-                        background: entregado ? 'rgba(255,255,255,.03)' : esBebida ? 'rgba(74,158,255,.08)' : 'none',
-                        border: esBebida && !entregado ? '1px solid rgba(74,158,255,.2)' : '1px solid transparent',
-                        transition:'all .15s',
-                        opacity: entregado ? 0.5 : 1,
-                      }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, flex:1 }}>
-                        {/* Checkbox */}
+                        padding:'12px 12px', marginBottom:8, borderRadius:12, cursor:'pointer',
+                        background: entregado
+                          ? 'rgba(255,255,255,.02)'
+                          : esBebida
+                            ? 'rgba(74,158,255,.1)'
+                            : 'rgba(245,166,35,.06)',
+                        border: `1.5px solid ${entregado ? 'var(--border)' : esBebida ? 'rgba(74,158,255,.3)' : 'rgba(245,166,35,.25)'}`,
+                        transition:'all .15s', opacity: entregado ? 0.5 : 1 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:12, flex:1 }}>
+                        {/* Checkbox grande */}
                         <div style={{
-                          width:18, height:18, borderRadius:5, flexShrink:0,
-                          border: `2px solid ${entregado ? 'var(--green)' : esBebida ? '#4a9eff' : 'var(--border)'}`,
+                          width:28, height:28, borderRadius:8, flexShrink:0,
+                          border: `2.5px solid ${entregado ? 'var(--green)' : esBebida ? '#4a9eff' : 'var(--accent)'}`,
                           background: entregado ? 'var(--green)' : 'transparent',
-                          display:'flex', alignItems:'center', justifyContent:'center',
-                          transition:'all .15s' }}>
-                          {entregado && <span style={{ color:'#111', fontSize:11, fontWeight:900 }}>✓</span>}
+                          display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {entregado && <span style={{ color:'#111', fontSize:15, fontWeight:900 }}>✓</span>}
                         </div>
-                        <span style={{
-                          textDecoration: entregado ? 'line-through' : 'none',
-                          color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--muted2)',
-                          fontWeight: esBebida ? 700 : 400 }}>
-                          {esBebida && !entregado && '🥤 '}×{item.qty} {item.name}
-                          {!esBebida && !entregado && `×${item.qty} ${item.name}`}
-                          {entregado && `×${item.qty} ${item.name}`}
-                        </span>
+                        {/* Badge cantidad */}
+                        <div style={{
+                          background: esBebida ? '#4a9eff' : 'var(--accent)',
+                          color:'#111', fontWeight:900, fontSize:14,
+                          width:30, height:30, borderRadius:'50%', flexShrink:0,
+                          display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {item.qty}
+                        </div>
+                        <div>
+                          <div style={{
+                            fontWeight:800, fontSize:17,
+                            textDecoration: entregado ? 'line-through' : 'none',
+                            color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--text)' }}>
+                            {esBebida ? '🥤 ' : ''}{item.name}
+                          </div>
+                          <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>
+                            S/{Number(item.price).toFixed(2)} c/u
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                         <span style={{
-                          fontFamily:'var(--mono)', flexShrink:0,
-                          color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--muted2)',
+                          fontFamily:'var(--mono)', fontWeight:900, fontSize:18,
+                          color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--accent)',
                           textDecoration: entregado ? 'line-through' : 'none' }}>
                           S/{(item.price*item.qty).toFixed(2)}
                         </span>
-                        {/* Botón eliminar — solo cuando está marcado */}
                         {entregado && (
-                          <button
-                            onClick={e => { e.stopPropagation(); eliminarItemDeCobro(item.name, item.price, item.qty) }}
+                          <button onClick={e => { e.stopPropagation(); eliminarItemDeCobro(item.name, item.price, item.qty) }}
                             style={{ background:'rgba(255,77,77,.15)', border:'1px solid rgba(255,77,77,.4)',
-                              color:'var(--red)', borderRadius:8, padding:'3px 8px',
-                              fontSize:12, cursor:'pointer', fontWeight:800, flexShrink:0 }}>
-                            🗑
-                          </button>
+                              color:'var(--red)', borderRadius:8, padding:'4px 10px',
+                              fontSize:14, cursor:'pointer', fontWeight:800 }}>🗑</button>
                         )}
                       </div>
                     </div>

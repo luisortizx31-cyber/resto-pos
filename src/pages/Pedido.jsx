@@ -25,6 +25,7 @@ export default function Pedido() {
   const [buscar, setBuscar]           = useState('')
   const [deshabilitados, setDeshabilitados] = useState(new Set())
   const [showConfirm, setShowConfirm] = useState(false)
+  const [catsAbiertas, setCatsAbiertas] = useState({})
 
   const setNota = (key, val) => {
     setCarrito(prev => prev[key] ? { ...prev, [key]: { ...prev[key], nota: val } } : prev)
@@ -206,27 +207,55 @@ export default function Pedido() {
           </div>
         )
 
-        return Object.entries(menuFiltrado).map(([cat, items]) => (
-          <div key={cat} style={{ marginBottom:8 }}>
-            {/* Header de categoría — grande y resaltado para el mesero */}
-            <div style={{
-              margin:'12px 12px 8px',
-              background:'linear-gradient(135deg, rgba(245,166,35,.15), rgba(245,166,35,.05))',
-              border:'1.5px solid rgba(245,166,35,.4)',
-              borderRadius:14, padding:'12px 16px',
-              display:'flex', alignItems:'center', gap:10 }}>
-              <div style={{ width:4, height:32, background:'var(--accent)',
+        return Object.entries(menuFiltrado).map(([cat, items]) => {
+          // Si hay búsqueda activa, abrir todas. Si no, respetar estado manual
+          const abierta = q ? true : (catsAbiertas[cat] !== false && catsAbiertas[cat] !== undefined
+            ? catsAbiertas[cat]
+            : false) // por defecto cerradas
+          const totalEnCarrito = items.reduce((a, item) => {
+            const tieneVariantes = item.variantes?.length > 0
+            return a + (tieneVariantes
+              ? item.variantes.reduce((b, _, vi) => b + getQty(item.id, vi), 0)
+              : getQty(item.id, 0))
+          }, 0)
+
+          return (
+          <div key={cat} style={{ marginBottom:6 }}>
+            {/* Header acordeón */}
+            <div onClick={() => setCatsAbiertas(prev => ({ ...prev, [cat]: !abierta }))}
+              style={{
+                margin:'6px 12px 0',
+                background: abierta
+                  ? 'linear-gradient(135deg, rgba(245,166,35,.18), rgba(245,166,35,.08))'
+                  : 'linear-gradient(135deg, rgba(245,166,35,.08), rgba(245,166,35,.03))',
+                border:`1.5px solid ${abierta ? 'rgba(245,166,35,.5)' : 'rgba(245,166,35,.2)'}`,
+                borderRadius: abierta ? '14px 14px 0 0' : 14,
+                padding:'13px 16px', cursor:'pointer',
+                display:'flex', alignItems:'center', gap:10,
+                transition:'all .2s', userSelect:'none' }}>
+              <div style={{ width:4, height:28, background:'var(--accent)',
                 borderRadius:4, flexShrink:0 }} />
-              <div style={{ fontWeight:900, fontSize:20, color:'var(--accent)',
-                letterSpacing:1, textTransform:'uppercase' }}>{cat}</div>
-              <div style={{ marginLeft:'auto', background:'rgba(245,166,35,.2)',
-                borderRadius:20, padding:'3px 10px',
-                fontSize:11, fontWeight:800, color:'var(--accent)', letterSpacing:1 }}>
-                {items.length} plato{items.length !== 1 ? 's' : ''}
-              </div>
+              <div style={{ fontWeight:900, fontSize:18, color:'var(--accent)',
+                letterSpacing:1, textTransform:'uppercase', flex:1 }}>{cat}</div>
+              {totalEnCarrito > 0 && (
+                <div style={{ background:'var(--accent)', color:'#111',
+                  borderRadius:20, padding:'3px 10px',
+                  fontSize:11, fontWeight:900 }}>
+                  {totalEnCarrito} sel.
+                </div>
+              )}
+              <div style={{ fontSize:13, color:'var(--accent)', fontWeight:800,
+                transition:'transform .2s',
+                transform: abierta ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</div>
             </div>
-            <div style={{ padding:'0 12px 4px' }}>
-            {items.map(item => {
+
+            {/* Items — solo si abierta */}
+            {abierta && (
+              <div style={{ margin:'0 12px', padding:'8px 8px 4px',
+                background:'rgba(245,166,35,.04)',
+                border:'1.5px solid rgba(245,166,35,.2)',
+                borderTop:'none', borderRadius:'0 0 14px 14px' }}>
+              {items.map(item => {
               const disabled     = deshabilitados.has(item.id)
               const tieneVariantes = item.variantes?.length > 0
               const totalItemQty = tieneVariantes
@@ -381,8 +410,10 @@ export default function Pedido() {
               )
             })}
             </div>
+            )}
           </div>
-        ))
+          )
+        })
       })()}
 
       {/* Adicionales */}
