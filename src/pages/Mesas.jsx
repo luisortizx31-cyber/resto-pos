@@ -39,11 +39,16 @@ export default function Mesas() {
 
   // Auto-llenar efectivo cuando se abre el modal de cobro
   useEffect(() => {
+  // Auto-llenar efectivo cuando se abre el modal de cobro
+  useEffect(() => {
     if (confirming) {
       const { total } = calcTotal(confirming.orders, descuento)
       setPago(p => ({ ...p, efectivo: p.efectivo || total.toFixed(2) }))
     }
   }, [confirming?.num])
+
+  // Cargar checks guardados cuando se abre el modal de cobro
+  useEffect(() => {
     if (confirming) {
       const saved = localStorage.getItem(`gastro_check_mesa_${confirming.num}`)
       setItemsEntregados(saved ? JSON.parse(saved) : {})
