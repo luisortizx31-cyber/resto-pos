@@ -1049,7 +1049,7 @@ export default function ClienteMesa() {
                 )}
               </div>
               )
-            })
+            })}
           </>
         )
       })()}

@@ -39,8 +39,6 @@ export default function Mesas() {
 
   // Auto-llenar efectivo cuando se abre el modal de cobro
   useEffect(() => {
-  // Auto-llenar efectivo cuando se abre el modal de cobro
-  useEffect(() => {
     if (confirming) {
       const { total } = calcTotal(confirming.orders, descuento)
       setPago(p => ({ ...p, efectivo: p.efectivo || total.toFixed(2) }))
@@ -50,7 +48,7 @@ export default function Mesas() {
   // Cargar checks guardados cuando se abre el modal de cobro
   useEffect(() => {
     if (confirming) {
-      const saved = localStorage.getItem(`gastro_check_mesa_${confirming.num}`)
+      const saved = localStorage.getItem(`gastro_check_mesa_${restoId}_${confirming.num}`)
       setItemsEntregados(saved ? JSON.parse(saved) : {})
     }
   }, [confirming?.num])
@@ -59,7 +57,7 @@ export default function Mesas() {
   const toggleItemEntregado = (itemKey, mesaNum) => {
     setItemsEntregados(prev => {
       const nuevo = { ...prev, [itemKey]: !prev[itemKey] }
-      localStorage.setItem(`gastro_check_mesa_${mesaNum}`, JSON.stringify(nuevo))
+      localStorage.setItem(`gastro_check_mesa_${restoId}_${mesaNum}`, JSON.stringify(nuevo))
       return nuevo
     })
   }
@@ -249,7 +247,7 @@ export default function Mesas() {
     // Limpiar check del item eliminado
     const itemKey = `${itemName}__${itemPrice}`
     toggleItemEntregado(itemKey + '__removed', mesaNum)
-    localStorage.removeItem(`gastro_check_mesa_${mesaNum}`)
+    localStorage.removeItem(`gastro_check_mesa_${restoId}_${mesaNum}`)
     setItemsEntregados({})
 
     // Recalcular total con nuevos orders
@@ -388,7 +386,7 @@ export default function Mesas() {
       setConfirming(null)
       setPago({ yape:'', efectivo:'' })
       // Limpiar checks de la mesa al cobrar
-      localStorage.removeItem(`gastro_check_mesa_${confirming.num}`)
+      localStorage.removeItem(`gastro_check_mesa_${restoId}_${confirming.num}`)
     } catch { showToast('Error al cobrar','error') }
     setProcessing(false)
   }
@@ -767,46 +765,43 @@ export default function Mesas() {
                     <div key={i} onClick={() => toggleItemEntregado(itemKey, confirming.num)}
                       style={{
                         display:'flex', justifyContent:'space-between', alignItems:'center',
-                        padding:'12px 12px', marginBottom:8, borderRadius:12, cursor:'pointer',
-                        background: entregado
-                          ? 'rgba(255,255,255,.02)'
-                          : esBebida
-                            ? 'rgba(74,158,255,.1)'
-                            : 'rgba(245,166,35,.06)',
-                        border: `1.5px solid ${entregado ? 'var(--border)' : esBebida ? 'rgba(74,158,255,.3)' : 'rgba(245,166,35,.25)'}`,
+                        padding:'8px 10px', marginBottom:6, borderRadius:10, cursor:'pointer',
+                        background: entregado ? 'rgba(255,255,255,.02)' : esBebida ? 'rgba(74,158,255,.08)' : 'rgba(245,166,35,.05)',
+                        border: `1.5px solid ${entregado ? 'var(--border)' : esBebida ? 'rgba(74,158,255,.25)' : 'rgba(245,166,35,.2)'}`,
                         transition:'all .15s', opacity: entregado ? 0.5 : 1 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:12, flex:1 }}>
-                        {/* Checkbox grande */}
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+                        {/* Checkbox */}
                         <div style={{
-                          width:28, height:28, borderRadius:8, flexShrink:0,
-                          border: `2.5px solid ${entregado ? 'var(--green)' : esBebida ? '#4a9eff' : 'var(--accent)'}`,
+                          width:20, height:20, borderRadius:6, flexShrink:0,
+                          border: `2px solid ${entregado ? 'var(--green)' : esBebida ? '#4a9eff' : 'var(--accent)'}`,
                           background: entregado ? 'var(--green)' : 'transparent',
                           display:'flex', alignItems:'center', justifyContent:'center' }}>
-                          {entregado && <span style={{ color:'#111', fontSize:15, fontWeight:900 }}>✓</span>}
+                          {entregado && <span style={{ color:'#111', fontSize:12, fontWeight:900 }}>✓</span>}
                         </div>
                         {/* Badge cantidad */}
                         <div style={{
                           background: esBebida ? '#4a9eff' : 'var(--accent)',
-                          color:'#111', fontWeight:900, fontSize:14,
-                          width:30, height:30, borderRadius:'50%', flexShrink:0,
+                          color:'#111', fontWeight:900, fontSize:11,
+                          width:22, height:22, borderRadius:'50%', flexShrink:0,
                           display:'flex', alignItems:'center', justifyContent:'center' }}>
                           {item.qty}
                         </div>
-                        <div>
+                        <div style={{ minWidth:0, flex:1 }}>
                           <div style={{
-                            fontWeight:800, fontSize:17,
+                            fontWeight:700, fontSize:13,
                             textDecoration: entregado ? 'line-through' : 'none',
-                            color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--text)' }}>
+                            color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--text)',
+                            wordBreak:'break-word' }}>
                             {esBebida ? '🥤 ' : ''}{item.name}
                           </div>
-                          <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>
+                          <div style={{ fontSize:11, color:'var(--muted)' }}>
                             S/{Number(item.price).toFixed(2)} c/u
                           </div>
                         </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, marginLeft:8 }}>
                         <span style={{
-                          fontFamily:'var(--mono)', fontWeight:900, fontSize:18,
+                          fontFamily:'var(--mono)', fontWeight:800, fontSize:14,
                           color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--accent)',
                           textDecoration: entregado ? 'line-through' : 'none' }}>
                           S/{(item.price*item.qty).toFixed(2)}
@@ -814,8 +809,8 @@ export default function Mesas() {
                         {entregado && (
                           <button onClick={e => { e.stopPropagation(); eliminarItemDeCobro(item.name, item.price, item.qty) }}
                             style={{ background:'rgba(255,77,77,.15)', border:'1px solid rgba(255,77,77,.4)',
-                              color:'var(--red)', borderRadius:8, padding:'4px 10px',
-                              fontSize:14, cursor:'pointer', fontWeight:800 }}>🗑</button>
+                              color:'var(--red)', borderRadius:7, padding:'3px 7px',
+                              fontSize:12, cursor:'pointer', fontWeight:800, flexShrink:0 }}>🗑</button>
                         )}
                       </div>
                     </div>
