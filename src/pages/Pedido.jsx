@@ -342,7 +342,7 @@ export default function Pedido() {
                                 <div>
                                   <span style={{ fontWeight:700, fontSize:13,
                                     textDecoration: varDisabled ? 'line-through' : 'none',
-                                    color: varDisabled ? 'var(--muted)' : 'var(--accent)' }}>{v.nombre}</span>
+                                    color: varDisabled ? 'var(--muted)' : qty > 0 ? 'var(--accent)' : 'var(--text)' }}>{v.nombre}</span>
                                   <span style={{ fontFamily:'var(--mono)', fontSize:12,
                                     color: varDisabled ? 'var(--muted)' : 'var(--accent)', marginLeft:8, fontWeight:700 }}>
                                     S/{Number(v.precio).toFixed(2)}

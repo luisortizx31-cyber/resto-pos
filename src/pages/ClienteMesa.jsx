@@ -977,7 +977,7 @@ export default function ClienteMesa() {
                                   <div>
                                     <span style={{ fontWeight:700, fontSize:13,
                                       textDecoration: varDisabled ? 'line-through' : 'none',
-                                      color: varDisabled ? '#8b949e' : '#f5a623' }}>{v.nombre}</span>
+                                      color: varDisabled ? '#8b949e' : qty > 0 ? '#f5a623' : '#c9d1d9' }}>{v.nombre}</span>
                                     <span style={{ fontFamily:'monospace', fontSize:12,
                                       color: varDisabled ? '#8b949e' : '#f5a623', marginLeft:8, fontWeight:700 }}>
                                       S/{Number(v.precio).toFixed(2)}
