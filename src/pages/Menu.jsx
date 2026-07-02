@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { db } from '../lib/firebase'
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
+import { subirFotoMenu } from '../lib/imagen'
 
 const DEFAULT_CATEGORIES = ['Ceviches', 'Combinados', 'Bebidas', 'Guarniciones', 'Entradas', 'Postres', 'Otros']
 const EMPTY_FORM = { name:'', category:'', fotoUrl:'', tieneVariantes: false, price:'', variantes:[{nombre:'',precio:''}] }
@@ -18,6 +19,25 @@ export default function Menu() {
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES)
   const [nuevaCat, setNuevaCat] = useState('')
   const [catsAbiertas, setCatsAbiertas] = useState({})
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleFotoFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permitir volver a elegir el mismo archivo después
+    if (!file) return
+    if (!file.type.startsWith('image/')) { showToast('Elige un archivo de imagen', 'error'); return }
+    setSubiendoFoto(true)
+    try {
+      const url = await subirFotoMenu(restoId, editId, file)
+      setForm(f => ({ ...f, fotoUrl: url }))
+      showToast('✅ Foto subida')
+    } catch (e) {
+      console.error(e)
+      showToast('Error al subir la foto', 'error')
+    }
+    setSubiendoFoto(false)
+  }
   const [tabMenu, setTabMenu]   = useState('platos')
   const [deshabilitados, setDeshabilitados] = useState(new Set())
   const showToast = useToast()
@@ -345,7 +365,7 @@ export default function Menu() {
           <div style={{ padding:'20px 16px' }}>
             {/* Foto */}
             <div style={{ marginBottom:16 }}>
-              <div className="section-label">URL de imagen (opcional)</div>
+              <div className="section-label">Foto (opcional)</div>
               {form.fotoUrl && (
                 <img src={form.fotoUrl} alt="preview"
                   style={{ width:120, height:120, objectFit:'cover',
@@ -353,6 +373,17 @@ export default function Menu() {
                     display:'block', marginBottom:10 }}
                   onError={e => e.target.style.display='none'} />
               )}
+              <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+                onChange={handleFotoFile} style={{ display:'none' }} />
+              <button type="button" className="btn btn-primary"
+                style={{ width:'100%', padding:13, fontSize:13, marginBottom:10 }}
+                disabled={subiendoFoto}
+                onClick={() => fileInputRef.current?.click()}>
+                {subiendoFoto ? '⏳ SUBIENDO...' : '📷 SUBIR FOTO'}
+              </button>
+              <div style={{ fontSize:11, color:'var(--muted)', marginBottom:8 }}>
+                Se comprime automáticamente al subirla — o pega una URL manual:
+              </div>
               <input className="input" placeholder="https://ejemplo.com/imagen.jpg"
                 value={form.fotoUrl}
                 onChange={e => setForm(f => ({ ...f, fotoUrl: e.target.value }))} />

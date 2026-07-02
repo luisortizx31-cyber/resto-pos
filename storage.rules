@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Fotos del menú — lectura pública (se muestran en la carta al cliente),
+    // escritura solo staff autenticado del mismo restaurante o superadmin.
+    match /restaurantes/{restoId}/menu/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null &&
+        (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin') &&
+        request.resource.size < 500 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase/firestore'
 import { getDatabase } from 'firebase/database'
 import { getAuth } from 'firebase/auth'
 import { getFunctions } from 'firebase/functions'
+import { getStorage } from 'firebase/storage'
 
 // Verifica que las variables de entorno estén definidas
 const required = [
@@ -55,3 +56,4 @@ export const db        = getFirestore(app)
 export const rtdb      = getDatabase(app)
 export const auth      = getAuth(app)
 export const functions = getFunctions(app)
+export const storage   = getStorage(app)
