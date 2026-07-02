@@ -373,7 +373,7 @@ export default function Menu() {
                     display:'block', marginBottom:10 }}
                   onError={e => e.target.style.display='none'} />
               )}
-              <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+              <input ref={fileInputRef} type="file" accept="image/*"
                 onChange={handleFotoFile} style={{ display:'none' }} />
               <button type="button" className="btn btn-primary"
                 style={{ width:'100%', padding:13, fontSize:13, marginBottom:10 }}
