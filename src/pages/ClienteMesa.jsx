@@ -899,7 +899,7 @@ export default function ClienteMesa() {
                     background:'rgba(245,166,35,.03)',
                     border:'1.5px solid rgba(245,166,35,.2)',
                     borderTop:'none', borderRadius:'0 0 14px 14px' }}>
-                {items.map(item => {
+                {[...items].sort((a, b) => (b.variantes?.length > 0) - (a.variantes?.length > 0)).map(item => {
                   const disabled      = deshabilitados.has(item.id)
                   const tieneVariantes = item.variantes?.length > 0
                   const totalItemQty  = tieneVariantes
