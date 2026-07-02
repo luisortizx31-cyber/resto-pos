@@ -931,7 +931,7 @@ export default function ClienteMesa() {
                         <div style={{ flex:1, padding:'10px 12px' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                             <div style={{ fontWeight:600, fontSize:15,
-                              color: disabled ? '#8b949e' : '#c9d1d9',
+                              color: disabled ? '#8b949e' : '#f5a623',
                               textDecoration: disabled ? 'line-through' : 'none' }}>{item.name}</div>
                             {disabled && (
                               <span style={{ background:'rgba(255,77,77,.15)', color:'#ff4d4d',
@@ -977,7 +977,7 @@ export default function ClienteMesa() {
                                   <div>
                                     <span style={{ fontWeight:700, fontSize:13,
                                       textDecoration: varDisabled ? 'line-through' : 'none',
-                                      color: varDisabled ? '#8b949e' : qty > 0 ? '#f5a623' : '#c9d1d9' }}>{v.nombre}</span>
+                                      color: varDisabled ? '#8b949e' : '#f5a623' }}>{v.nombre}</span>
                                     <span style={{ fontFamily:'monospace', fontSize:12,
                                       color: varDisabled ? '#8b949e' : '#f5a623', marginLeft:8, fontWeight:700 }}>
                                       S/{Number(v.precio).toFixed(2)}

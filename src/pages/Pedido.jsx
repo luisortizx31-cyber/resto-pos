@@ -290,7 +290,7 @@ export default function Pedido() {
                       <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                         <div style={{ fontWeight:700, fontSize:15,
                           textDecoration: disabled ? 'line-through' : 'none',
-                          color: disabled ? 'var(--muted)' : 'var(--text)' }}>{item.name}</div>
+                          color: disabled ? 'var(--muted)' : 'var(--accent)' }}>{item.name}</div>
                         {disabled && (
                           <span style={{ background:'rgba(255,77,77,.15)', color:'#ff4d4d',
                             fontSize:9, fontWeight:800, padding:'2px 7px',
@@ -342,7 +342,7 @@ export default function Pedido() {
                                 <div>
                                   <span style={{ fontWeight:700, fontSize:13,
                                     textDecoration: varDisabled ? 'line-through' : 'none',
-                                    color: varDisabled ? 'var(--muted)' : qty > 0 ? 'var(--accent)' : 'var(--text)' }}>{v.nombre}</span>
+                                    color: varDisabled ? 'var(--muted)' : 'var(--accent)' }}>{v.nombre}</span>
                                   <span style={{ fontFamily:'var(--mono)', fontSize:12,
                                     color: varDisabled ? 'var(--muted)' : 'var(--accent)', marginLeft:8, fontWeight:700 }}>
                                     S/{Number(v.precio).toFixed(2)}
