@@ -208,13 +208,15 @@ export default function Menu() {
 
       {/* ── PLATOS ── */}
       {tabMenu === 'platos' && (<>
-        <div style={{ display:'flex', borderBottom:'1px solid var(--border)' }}>
+        <div style={{ display:'flex', gap:8, padding:'10px 16px',
+          background:'var(--surface)', borderBottom:'1px solid var(--border)' }}>
           {[['lista','Lista'],['form', editId ? 'Editar' : 'Nuevo']].map(([t,l]) => (
             <button key={t} onClick={() => setActiveTab(t)} style={{
-              flex:1, padding:'11px 0', background:'none', border:'none',
-              borderBottom: activeTab===t ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeTab===t ? 'var(--accent)' : 'var(--muted)',
-              fontFamily:'var(--font)', fontWeight:700, fontSize:13,
+              flex:1, padding:'8px 0', borderRadius:20,
+              background: activeTab===t ? 'var(--accent)' : 'var(--card)',
+              border:`1px solid ${activeTab===t ? 'var(--accent)' : 'var(--border)'}`,
+              color: activeTab===t ? '#111' : 'var(--muted)',
+              fontFamily:'var(--font)', fontWeight:700, fontSize:12, letterSpacing:1,
               cursor:'pointer' }}>{l}</button>
           ))}
         </div>
