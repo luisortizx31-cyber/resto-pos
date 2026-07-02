@@ -28,6 +28,13 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Limita el ancho en pantallas grandes (laptop/desktop) — el diseño es
+   tipo app móvil y se veía estirado/gigante en pantallas anchas */
+#root {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
