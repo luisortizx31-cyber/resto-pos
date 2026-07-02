@@ -17,6 +17,7 @@ export default function Menu() {
   const [activeTab, setActiveTab] = useState('lista')
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES)
   const [nuevaCat, setNuevaCat] = useState('')
+  const [catsAbiertas, setCatsAbiertas] = useState({})
   const [tabMenu, setTabMenu]   = useState('platos')
   const [deshabilitados, setDeshabilitados] = useState(new Set())
   const showToast = useToast()
@@ -227,10 +228,30 @@ export default function Menu() {
               <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>Cargando...</div>
             ) : items.length === 0 ? (
               <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>Sin platos aún</div>
-            ) : categoriesOrdenadas.map(cat => (
-              <div key={cat} style={{ marginBottom:20 }}>
-                <div className="section-label">{cat}</div>
-                {(byCategory[cat] || []).map(item => {
+            ) : categoriesOrdenadas.map(cat => {
+              const abierta = catsAbiertas[cat] || false
+              const catItems = byCategory[cat] || []
+              return (
+              <div key={cat} style={{ marginBottom:12 }}>
+                <div onClick={() => setCatsAbiertas(prev => ({ ...prev, [cat]: !abierta }))}
+                  style={{
+                    background: abierta
+                      ? 'linear-gradient(135deg, rgba(245,166,35,.15), rgba(245,166,35,.06))'
+                      : 'linear-gradient(135deg, rgba(245,166,35,.07), rgba(245,166,35,.02))',
+                    border:`1.5px solid ${abierta ? 'rgba(245,166,35,.5)' : 'rgba(245,166,35,.2)'}`,
+                    borderRadius: abierta ? '14px 14px 0 0' : 14,
+                    padding:'12px 16px', cursor:'pointer',
+                    display:'flex', alignItems:'center', gap:10, userSelect:'none' }}>
+                  <div style={{ width:4, height:22, background:'var(--accent)', borderRadius:4, flexShrink:0 }} />
+                  <div className="section-label" style={{ margin:0, flex:1, color:'var(--accent)', fontSize:13 }}>{cat}</div>
+                  <div style={{ fontSize:11, color:'var(--muted)' }}>{catItems.length} plato{catItems.length!==1?'s':''}</div>
+                  <div style={{ fontSize:12, color:'var(--accent)', fontWeight:800,
+                    transition:'transform .2s', transform: abierta ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</div>
+                </div>
+                {abierta && (
+                <div style={{ padding:'10px 8px 2px', background:'rgba(245,166,35,.03)',
+                  border:'1.5px solid rgba(245,166,35,.2)', borderTop:'none', borderRadius:'0 0 14px 14px' }}>
+                {catItems.map(item => {
                   const disabled = deshabilitados.has(item.id)
                   const tieneVariantes = item.variantes?.length > 0
                   return (
@@ -312,8 +333,11 @@ export default function Menu() {
                     </div>
                   )
                 })}
+                </div>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
