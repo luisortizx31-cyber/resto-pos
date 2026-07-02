@@ -1,5 +1,7 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useState, createContext, useContext, useEffect } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
+import { auth } from '../lib/firebase'
 import { getSession, clearSession, canAccess, saveLastRestoId } from '../lib/auth'
 
 export const ToastContext   = createContext(null)
@@ -23,15 +25,29 @@ export default function Layout() {
       setChecked(true)
       return
     }
-    setSession(s)
-    setChecked(true)
-    // Redirigir a ruta correcta según rol si carga raíz
-    const path = location.pathname
-    if (path === '/' || path === '') {
-      if (s.role === 'cocina')          navigate('/cocina',      { replace: true })
-      else if (s.role === 'repartidor') navigate('/repartidor',  { replace: true })
-      else                              navigate('/mesas',       { replace: true })
-    }
+    // Esperar a que Firebase Auth restaure la sesión (custom token) antes
+    // de habilitar las lecturas autenticadas de las páginas internas — si
+    // no, justo tras refrescar la página hay un instante donde request.auth
+    // todavía es null y las lecturas fallan con permission-denied antes de
+    // que la sesión termine de restaurarse.
+    const unsub = onAuthStateChanged(auth, user => {
+      if (!user) {
+        clearSession()
+        navigate('/login', { replace: true })
+        setChecked(true)
+        return
+      }
+      setSession(s)
+      setChecked(true)
+      // Redirigir a ruta correcta según rol si carga raíz
+      const path = location.pathname
+      if (path === '/' || path === '') {
+        if (s.role === 'cocina')          navigate('/cocina',      { replace: true })
+        else if (s.role === 'repartidor') navigate('/repartidor',  { replace: true })
+        else                              navigate('/mesas',       { replace: true })
+      }
+    })
+    return () => unsub()
   }, [])   // solo al montar
 
   const showToast = (msg, type = 'success') => {

@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { db, rtdb } from '../lib/firebase'
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, getDoc, writeBatch } from 'firebase/firestore'
+import { db, rtdb, functions, auth } from '../lib/firebase'
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore'
 import { ref, remove, get } from 'firebase/database'
+import { httpsCallable } from 'firebase/functions'
+import { onAuthStateChanged } from 'firebase/auth'
 import { isSuperAdmin, clearSession } from '../lib/auth'
+
+const gestionarAuthResto = httpsCallable(functions, 'gestionarAuthResto')
+const adminListarRestos  = httpsCallable(functions, 'adminListarRestos')
 
 const DEFAULT_FORM = { id:'', nombre:'', whatsapp:'', mesaCount:'10', delivery:true,
   pinMesero:'1111', pinCocina:'2222', pinDueno:'3333', pinRepartidor:'4444' }
@@ -21,19 +26,20 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (!isSuperAdmin()) { navigate('/login'); return }
-    loadRestos()
+    // Esperar a que Firebase Auth restaure la sesión antes de llamar a
+    // adminListarRestos (requiere request.auth con claim role=='superadmin')
+    const unsub = onAuthStateChanged(auth, user => {
+      if (!user) { navigate('/login'); return }
+      loadRestos()
+    })
+    return () => unsub()
   }, [])
 
   const loadRestos = async () => {
     setLoading(true)
     try {
-      const snap = await getDocs(collection(db, 'restaurantes'))
-      const list = []
-      for (const d of snap.docs) {
-        const authSnap = await getDoc(doc(db, 'restaurantes', d.id, 'config', 'auth'))
-        list.push({ id: d.id, ...d.data(), auth: authSnap.data() || {} })
-      }
-      setRestos(list)
+      const res = await adminListarRestos()
+      setRestos(res.data.restos || [])
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -49,11 +55,14 @@ export default function AdminPanel() {
         active: true, tieneDelivery: form.delivery,
         creadoEn: new Date().toISOString(),
       })
-      await setDoc(doc(db, 'restaurantes', id, 'config', 'auth'), {
-        nombre: form.nombre.trim(), whatsapp: form.whatsapp.trim(),
-        pins: { mesero: form.pinMesero, cocina: form.pinCocina,
-                dueno: form.pinDueno, repartidor: form.pinRepartidor },
-        repartidores: [],
+      await gestionarAuthResto({
+        restoId: id, accion: 'adminCreate',
+        payload: {
+          nombre: form.nombre.trim(), whatsapp: form.whatsapp.trim(),
+          pins: { mesero: form.pinMesero, cocina: form.pinCocina,
+                  dueno: form.pinDueno, repartidor: form.pinRepartidor },
+          repartidores: [],
+        },
       })
       await setDoc(doc(db, 'restaurantes', id, 'config', 'mesas'), {
         total: parseInt(form.mesaCount) || 10
@@ -81,10 +90,6 @@ export default function AdminPanel() {
       whatsapp: r.whatsapp || '',
       mesaCount: String(r.mesaCount || 10),
       delivery: r.tieneDelivery !== false,
-      pinMesero:    r.auth?.pins?.mesero    || '1111',
-      pinCocina:    r.auth?.pins?.cocina    || '2222',
-      pinDueno:     r.auth?.pins?.dueno     || '3333',
-      pinRepartidor:r.auth?.pins?.repartidor|| '4444',
     })
     setMsg('')
     setTab('form')
@@ -98,10 +103,14 @@ export default function AdminPanel() {
         nombre: form.nombre.trim(), whatsapp: form.whatsapp.trim(),
         tieneDelivery: form.delivery,
       })
-      await updateDoc(doc(db, 'restaurantes', editId, 'config', 'auth'), {
-        nombre: form.nombre.trim(), whatsapp: form.whatsapp.trim(),
-        pins: { mesero: form.pinMesero, cocina: form.pinCocina,
-                dueno: form.pinDueno, repartidor: form.pinRepartidor },
+      // Nota: no se reenvían los PINs aquí — al editar ya no se leen desde
+      // el servidor (config/auth es ilegible por el cliente), así que
+      // reenviarlos sobreescribiría los PINs reales con los valores por
+      // defecto del formulario. Los PINs solo se fijan al crear el resto;
+      // para cambiarlos después se usa Config → PINs (como dueño).
+      await gestionarAuthResto({
+        restoId: editId, accion: 'adminUpdate',
+        payload: { nombre: form.nombre.trim(), whatsapp: form.whatsapp.trim() },
       })
       await updateDoc(doc(db, 'restaurantes', editId, 'config', 'general'), {
         nombre: form.nombre.trim(), whatsapp: form.whatsapp.trim(),
@@ -130,10 +139,11 @@ export default function AdminPanel() {
         if (snap.docs.length > 0) await batch.commit()
       }
       // Borrar configs
-      const configs = ['auth', 'mesas', 'categorias', 'general']
+      const configs = ['mesas', 'categorias', 'general']
       for (const cfg of configs) {
         await deleteDoc(doc(db, 'restaurantes', id, 'config', cfg)).catch(() => {})
       }
+      await gestionarAuthResto({ restoId: id, accion: 'adminDelete' }).catch(() => {})
       // Borrar documento principal
       await deleteDoc(doc(db, 'restaurantes', id))
       setRestos(r => r.filter(x => x.id !== id))
@@ -251,9 +261,6 @@ export default function AdminPanel() {
                   <div style={{ fontWeight:800, fontSize:16 }}>{r.nombre}</div>
                   <div style={{ fontFamily:'var(--mono)', fontSize:12, color:'var(--accent)', marginTop:2 }}>ID: {r.id}</div>
                   {r.whatsapp && <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>📱 {r.whatsapp}</div>}
-                  <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>
-                    PINs → mesero: <strong>{r.auth?.pins?.mesero||'1111'}</strong> | cocina: <strong>{r.auth?.pins?.cocina||'2222'}</strong> | dueño: <strong>{r.auth?.pins?.dueno||'3333'}</strong>
-                  </div>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end', flexShrink:0 }}>
                   <div style={{ fontSize:10, fontWeight:800, padding:'3px 10px', borderRadius:20,
@@ -375,25 +382,27 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {/* PINs */}
-          <div style={{ marginBottom:8 }}>
-            <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2, textTransform:'uppercase', marginBottom:10 }}>🔑 PINs de acceso</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              {[
-                ['pinMesero',    '🍽 Mesero'],
-                ['pinCocina',    '🍳 Cocina'],
-                ['pinDueno',     '👑 Dueño'],
-                ['pinRepartidor','🛵 Repartidor'],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <div style={{ fontSize:11, color:'var(--muted)', marginBottom:5 }}>{label}</div>
-                  <input className="input" maxLength={6} placeholder="PIN"
-                    value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                    style={{ marginBottom:0 }} />
-                </div>
-              ))}
+          {/* PINs — solo al crear. Para cambiarlos después, usar Config → PINs como dueño */}
+          {!editId && (
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2, textTransform:'uppercase', marginBottom:10 }}>🔑 PINs de acceso</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                {[
+                  ['pinMesero',    '🍽 Mesero'],
+                  ['pinCocina',    '🍳 Cocina'],
+                  ['pinDueno',     '👑 Dueño'],
+                  ['pinRepartidor','🛵 Repartidor'],
+                ].map(([key, label]) => (
+                  <div key={key}>
+                    <div style={{ fontSize:11, color:'var(--muted)', marginBottom:5 }}>{label}</div>
+                    <input className="input" maxLength={6} placeholder="PIN"
+                      value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                      style={{ marginBottom:0 }} />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {msg && (
             <div style={{ background: msg.startsWith('✅') ? 'rgba(39,201,122,.1)' : 'rgba(255,77,77,.1)',

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { loginResto, loginSuperAdmin, ROLE_INFO, getSession, getLastRestoId, saveSession, saveLastRestoId } from '../lib/auth'
-import { db } from '../lib/firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { loginResto, loginRepartidor, loginSuperAdmin, obtenerInfoLogin, ROLE_INFO, getSession, getLastRestoId, saveLastRestoId } from '../lib/auth'
 
 const MAX_INTENTOS = 3
 
@@ -39,10 +37,10 @@ export default function Login() {
     if (!restoId.trim()) { setError('Ingresa el código del restaurante'); return }
     setLoading(true); setError('')
     try {
-      const snap = await getDoc(doc(db, 'restaurantes', restoId.trim().toLowerCase(), 'config', 'auth'))
-      if (!snap.exists()) { setError('❌ Restaurante no encontrado.'); setLoading(false); return }
-      setNombreResto(snap.data().nombre || restoId)
-      setRepartidores(snap.data().repartidores || [])
+      const res = await obtenerInfoLogin(restoId.trim().toLowerCase())
+      if (!res.ok) { setError('❌ Restaurante no encontrado.'); setLoading(false); return }
+      setNombreResto(res.nombre || restoId)
+      setRepartidores(res.repartidores || [])
       setIntentos(0)
       setStep('rol')
     } catch { setError('Error de conexión. Intenta de nuevo.') }
@@ -70,40 +68,11 @@ export default function Login() {
     if (next.length === 4) {
       setLoading(true)
       setTimeout(async () => {
-        let res
-        if (role === 'repartidor' && repSeleccionado) {
-          // Verificar suspensión primero (soportar 'active' y 'activo' legacy)
-          const restoSnap = await getDoc(doc(db, 'restaurantes', restoId.trim().toLowerCase()))
-          if (restoSnap.exists()) {
-            const rd = restoSnap.data()
-            if (rd.active === false || rd.activo === false) {
-              setError('🚫 Este restaurante está suspendido. Contacta al administrador.')
-              setPin(''); setStep('id'); setLoading(false); return
-            }
-          }
-          if (next === repSeleccionado.pin) {
-            saveLastRestoId(restoId.trim().toLowerCase())
-            saveSession(restoId.trim().toLowerCase(), 'repartidor', {
-              restoNombre: nombreResto,
-              repartidorNombre: repSeleccionado.nombre,
-              repartidorId: repSeleccionado.id,
-              repartidorCelular: repSeleccionado.celular || '',
-            })
-            navigate('/repartidor', { replace: true })
-            return
-          } else {
-            const nuevosIntentos = intentos + 1
-            setIntentos(nuevosIntentos)
-            if (nuevosIntentos >= MAX_INTENTOS) {
-              setError('🔒 Demasiados intentos. Contacta al administrador.')
-              setPin(''); setLoading(false); return
-            }
-            setError(`PIN incorrecto. ${MAX_INTENTOS - nuevosIntentos} intento(s) restante(s).`)
-            setPin(''); setLoading(false); return
-          }
-        }
-        res = await loginResto(restoId.trim().toLowerCase(), role, next)
+        const res = role === 'repartidor' && repSeleccionado
+          ? await loginRepartidor(restoId.trim().toLowerCase(), repSeleccionado.id, next)
+          : await loginResto(restoId.trim().toLowerCase(), role, next)
         if (res.ok) {
+          saveLastRestoId(restoId.trim().toLowerCase())
           navigate(roleToPath(role), { replace: true })
         } else if (res.suspendido) {
           setError('🚫 Este restaurante está suspendido. Contacta al administrador.')

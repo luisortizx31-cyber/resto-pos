@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { rtdb, db } from '../lib/firebase'
 import { ref, onValue, update, remove } from 'firebase/database'
-import { doc, getDoc, setDoc, collection, getDocs, onSnapshot } from 'firebase/firestore'
+import { doc, setDoc, collection } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
+import { obtenerInfoLogin } from '../lib/auth'
 
 // ── Timer idéntico al del Repartidor ────────────────────────────────
 function Timer({ timeISO, urgentSecs = 1200, warnSecs = 600 }) {
@@ -97,8 +98,8 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
   // Carga datos de config una sola vez
   useEffect(() => {
     if (!restoId) return
-    getDoc(doc(db, 'restaurantes', restoId, 'config', 'auth')).then(snap => {
-      if (snap.exists()) setRepartidores(snap.data().repartidores || [])
+    obtenerInfoLogin(restoId).then(info => {
+      if (info.ok) setRepartidores(info.repartidores || [])
     })
   }, [restoId])
 

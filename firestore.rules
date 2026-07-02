@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Super admin PIN — solo Cloud Functions (Admin SDK) puede leerlo/escribirlo
+    match /config/superadmin {
+      allow read, write: if false;
+    }
+
+    match /restaurantes/{restoId} {
+      // Lectura pública: la necesita el cliente anónimo por QR (ClienteMesa/Delivery)
+      allow read: if true;
+
+      // Crear / borrar un restaurante: solo super admin
+      allow create, delete: if request.auth != null && request.auth.token.role == 'superadmin';
+
+      // Actualizar: staff del mismo resto, pero el campo active/activo
+      // (suspender) queda reservado para super admin
+      allow update: if request.auth != null && (
+        request.auth.token.role == 'superadmin' ||
+        (request.auth.token.restoId == restoId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['active', 'activo']))
+      );
+
+      // PINs y repartidores — solo Cloud Functions
+      match /config/auth {
+        allow read, write: if false;
+      }
+
+      // Resto de config (categorias, menu deshabilitados, mesas, general) — lectura pública
+      match /config/{cfgId} {
+        allow read: if true;
+        allow write: if request.auth != null &&
+          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+      }
+
+      // Menú — lectura pública, escritura solo staff del mismo resto
+      match /menu/{itemId} {
+        allow read: if true;
+        allow write: if request.auth != null &&
+          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+      }
+
+      // Mesas y pedidos — el cliente anónimo los toca por QR sin login.
+      // No se pueden restringir a auth sin romper el pedido por QR.
+      match /mesas/{num} {
+        allow read, write: if true;
+      }
+      match /pedidos/{pedidoId} {
+        allow read, write: if true;
+      }
+
+      // Historial de ventas — antes era 100% público
+      match /historial/{histId} {
+        allow read: if request.auth != null &&
+          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+        allow create, delete: if request.auth != null &&
+          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+      }
+    }
+  }
+}

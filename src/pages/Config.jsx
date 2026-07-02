@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
-import { db } from '../lib/firebase'
+import { db, functions } from '../lib/firebase'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
 import { useSession, useToast } from '../components/Layout'
+import { obtenerInfoLogin } from '../lib/auth'
+
+const gestionarAuthResto = httpsCallable(functions, 'gestionarAuthResto')
 
 export default function Config() {
   const session  = useSession()
@@ -23,12 +27,8 @@ export default function Config() {
   const loadConfig = async () => {
     setLoading(true)
     try {
-      const authSnap = await getDoc(doc(db, 'restaurantes', restoId, 'config', 'auth'))
-      if (authSnap.exists()) {
-        const d = authSnap.data()
-        setPins({ mesero: d.pins?.mesero||'', cocina: d.pins?.cocina||'', dueno: d.pins?.dueno||'' })
-        setRepartidores(d.repartidores || [])
-      }
+      const info = await obtenerInfoLogin(restoId)
+      if (info.ok) setRepartidores(info.repartidores || [])
       const restoSnap = await getDoc(doc(db, 'restaurantes', restoId))
       if (restoSnap.exists()) {
         setWhatsapp(restoSnap.data().whatsapp || '')
@@ -40,19 +40,19 @@ export default function Config() {
 
   const savePins = async () => {
     if (!currentPin) { showToast('Ingresa tu PIN actual de dueño', 'error'); return }
-    const snap = await getDoc(doc(db, 'restaurantes', restoId, 'config', 'auth'))
-    const currentDuenoPin = snap.data()?.pins?.dueno || '3333'
-    if (currentPin !== currentDuenoPin) { showToast('PIN actual incorrecto', 'error'); return }
     setSaving(true)
     try {
       const newPins = {}
       if (pins.mesero.length === 4) newPins.mesero = pins.mesero
       if (pins.cocina.length === 4)  newPins.cocina  = pins.cocina
       if (pins.dueno.length === 4)   newPins.dueno   = pins.dueno
-      await updateDoc(doc(db, 'restaurantes', restoId, 'config', 'auth'),
-        { pins: { ...snap.data()?.pins, ...newPins } })
+      const res = await gestionarAuthResto({
+        restoId, accion: 'setPins', payload: { pins: newPins, currentPin },
+      })
+      if (!res.data.ok) { showToast(res.data.error || 'Error al guardar', 'error'); setSaving(false); return }
       showToast('✅ PINs actualizados')
       setCurrentPin('')
+      setPins({ mesero:'', cocina:'', dueno:'' })
     } catch { showToast('Error al guardar', 'error') }
     setSaving(false)
   }
@@ -62,7 +62,9 @@ export default function Config() {
     setSaving(true)
     try {
       await updateDoc(doc(db, 'restaurantes', restoId), { whatsapp: whatsapp.trim() })
-      await updateDoc(doc(db, 'restaurantes', restoId, 'config', 'auth'), { whatsapp: whatsapp.trim() })
+      await gestionarAuthResto({
+        restoId, accion: 'setPins', payload: { whatsapp: whatsapp.trim() },
+      })
       showToast('✅ WhatsApp actualizado')
     } catch { showToast('Error al guardar', 'error') }
     setSaving(false)
@@ -72,32 +74,27 @@ export default function Config() {
     if (!nuevoRep.nombre.trim()) { showToast('El nombre es obligatorio', 'error'); return }
     if (!nuevoRep.celular.trim()) { showToast('El celular es obligatorio', 'error'); return }
     if (nuevoRep.pin.length !== 4) { showToast('PIN de exactamente 4 dígitos requerido', 'error'); return }
-    // Verificar PIN único
-    if (repartidores.some(r => r.pin === nuevoRep.pin)) {
-      showToast('Ese PIN ya lo usa otro repartidor', 'error'); return
-    }
-    const nuevo = [...repartidores, {
-      nombre: nuevoRep.nombre.trim(),
-      celular: nuevoRep.celular.trim(),
-      pin: nuevoRep.pin,
-      id: Date.now().toString()
-    }]
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'restaurantes', restoId, 'config', 'auth'), { repartidores: nuevo })
-      setRepartidores(nuevo)
+      const res = await gestionarAuthResto({
+        restoId, accion: 'addRepartidor',
+        payload: { nombre: nuevoRep.nombre, celular: nuevoRep.celular, pin: nuevoRep.pin },
+      })
+      if (!res.data.ok) { showToast(res.data.error || 'Error al guardar', 'error'); setSaving(false); return }
       setNuevoRep({ nombre:'', celular:'', pin:'' })
       showToast('✅ Repartidor agregado')
+      loadConfig()
     } catch { showToast('Error al guardar', 'error') }
     setSaving(false)
   }
 
   const eliminarRepartidor = async (id) => {
-    const nuevo = repartidores.filter(r => r.id !== id)
-    await updateDoc(doc(db, 'restaurantes', restoId, 'config', 'auth'), { repartidores: nuevo })
-    setRepartidores(nuevo)
+    try {
+      await gestionarAuthResto({ restoId, accion: 'removeRepartidor', payload: { id } })
+      setRepartidores(r => r.filter(x => x.id !== id))
+      showToast('🗑 Repartidor eliminado')
+    } catch { showToast('Error al eliminar', 'error') }
     setConfirmEliminarId(null)
-    showToast('🗑 Repartidor eliminado')
   }
 
   if (loading) return <div style={{ padding:40, textAlign:'center', color:'var(--muted)' }}>Cargando...</div>
