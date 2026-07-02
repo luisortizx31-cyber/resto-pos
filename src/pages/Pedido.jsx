@@ -160,7 +160,8 @@ export default function Pedido() {
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:130 }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', paddingBottom:130,
+      maxWidth:640, margin:'0 auto' }}>
       <div className="page-header">
         <button onClick={() => navigate('/mesas')}
           style={{ background:'none', border:'none', color:'var(--accent)',
@@ -448,7 +449,8 @@ export default function Pedido() {
       </div>
 
       {/* Bottom bar */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0,
+      <div style={{ position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
+        width:'100%', maxWidth:640,
         background:'var(--surface)', borderTop:'1px solid var(--border)',
         padding:'12px 16px 20px' }}>
         {canSend && (
