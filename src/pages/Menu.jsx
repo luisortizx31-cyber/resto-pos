@@ -265,16 +265,24 @@ export default function Menu() {
                             {/* Precios */}
                             {tieneVariantes ? (
                               <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:6 }}>
-                                {item.variantes.map((v,i) => (
-                                  <span key={i} style={{
-                                    background:'rgba(245,166,35,.12)',
-                                    border:'1px solid rgba(245,166,35,.3)',
-                                    borderRadius:20, padding:'3px 9px',
-                                    fontSize:11, fontWeight:700, color:'var(--accent)',
-                                    fontFamily:'var(--mono)', whiteSpace:'nowrap' }}>
-                                    {v.nombre} · S/{Number(v.precio).toFixed(2)}
-                                  </span>
-                                ))}
+                                {item.variantes.map((v,i) => {
+                                  const varKey = `${item.id}__${i}`
+                                  const varDisabled = deshabilitados.has(varKey)
+                                  return (
+                                    <span key={i} onClick={() => toggleDeshabilitar(varKey)}
+                                      title={varDisabled ? 'Habilitar presentación' : 'Marcar presentación agotada'}
+                                      style={{
+                                        background: varDisabled ? 'rgba(255,77,77,.1)' : 'rgba(245,166,35,.12)',
+                                        border: `1px solid ${varDisabled ? 'rgba(255,77,77,.35)' : 'rgba(245,166,35,.3)'}`,
+                                        borderRadius:20, padding:'3px 9px', cursor:'pointer',
+                                        fontSize:11, fontWeight:700,
+                                        color: varDisabled ? '#ff4d4d' : 'var(--accent)',
+                                        textDecoration: varDisabled ? 'line-through' : 'none',
+                                        fontFamily:'var(--mono)', whiteSpace:'nowrap' }}>
+                                      {varDisabled ? '🚫 ' : ''}{v.nombre} · S/{Number(v.precio).toFixed(2)}
+                                    </span>
+                                  )
+                                })}
                               </div>
                             ) : (
                               <div style={{ color: disabled ? 'var(--muted)' : 'var(--accent)',

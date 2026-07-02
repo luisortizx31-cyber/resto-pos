@@ -545,21 +545,30 @@ export default function Delivery() {
                   {!disabled && tieneVariantes && (
                     <div style={{ borderTop:'1px solid #21262d' }}>
                       {item.variantes.map((v, vi) => {
+                        const varDisabled = deshabilitados.has(`${item.id}__${vi}`)
                         const qty = getQty(item.id, vi)
                         return (
                           <div key={vi} style={{
                             display:'flex', alignItems:'center', justifyContent:'space-between',
                             padding:'9px 12px',
                             borderBottom: vi < item.variantes.length-1 ? '1px solid #21262d' : 'none',
-                            background: qty > 0 ? 'rgba(245,166,35,.04)' : 'none' }}>
+                            background: varDisabled ? 'rgba(255,255,255,.02)' : qty > 0 ? 'rgba(245,166,35,.04)' : 'none',
+                            opacity: varDisabled ? 0.55 : 1 }}>
                             <div>
                               <span style={{ fontWeight:700, fontSize:13,
-                                color: qty > 0 ? '#f5a623' : '#c9d1d9' }}>{v.nombre}</span>
+                                textDecoration: varDisabled ? 'line-through' : 'none',
+                                color: varDisabled ? '#8b949e' : qty > 0 ? '#f5a623' : '#c9d1d9' }}>{v.nombre}</span>
                               <span style={{ fontFamily:'monospace', fontSize:12,
-                                color:'#f5a623', marginLeft:8, fontWeight:700 }}>
+                                color: varDisabled ? '#8b949e' : '#f5a623', marginLeft:8, fontWeight:700 }}>
                                 S/{Number(v.precio).toFixed(2)}
                               </span>
+                              {varDisabled && (
+                                <span style={{ background:'rgba(255,77,77,.15)', color:'#ff4d4d',
+                                  fontSize:9, fontWeight:800, padding:'2px 7px',
+                                  borderRadius:20, letterSpacing:1, marginLeft:8 }}>AGOTADO</span>
+                              )}
                             </div>
+                            {!varDisabled && (
                             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                               <button onClick={() => setQty(item.id, vi, v.precio, item.name, v.nombre, item.category, -1)}
                                 style={{ width:32, height:32, borderRadius:'50%', background:'#21262d',
@@ -577,6 +586,7 @@ export default function Delivery() {
                                   fontSize:18, cursor:'pointer', display:'flex', alignItems:'center',
                                   justifyContent:'center', fontWeight:700 }}>+</button>
                             </div>
+                            )}
                           </div>
                         )
                       })}

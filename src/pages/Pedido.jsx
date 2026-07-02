@@ -314,6 +314,7 @@ export default function Pedido() {
                       {tieneVariantes ? (
                         item.variantes.map((v, vi) => {
                           const key = carritoKey(item.id, vi)
+                          const varDisabled = deshabilitados.has(key)
                           const qty = getQty(item.id, vi)
                           return (
                             <div key={vi}>
@@ -321,15 +322,23 @@ export default function Pedido() {
                                 display:'flex', alignItems:'center', justifyContent:'space-between',
                                 padding:'8px 12px',
                                 borderBottom: (vi < item.variantes.length-1 && !qty) ? '1px solid var(--border)' : 'none',
-                                background: qty > 0 ? 'rgba(245,166,35,.04)' : 'none' }}>
+                                background: varDisabled ? 'rgba(255,255,255,.02)' : qty > 0 ? 'rgba(245,166,35,.04)' : 'none',
+                                opacity: varDisabled ? 0.55 : 1 }}>
                                 <div>
                                   <span style={{ fontWeight:700, fontSize:13,
-                                    color: qty > 0 ? 'var(--accent)' : 'var(--text)' }}>{v.nombre}</span>
+                                    textDecoration: varDisabled ? 'line-through' : 'none',
+                                    color: varDisabled ? 'var(--muted)' : qty > 0 ? 'var(--accent)' : 'var(--text)' }}>{v.nombre}</span>
                                   <span style={{ fontFamily:'var(--mono)', fontSize:12,
-                                    color:'var(--accent)', marginLeft:8, fontWeight:700 }}>
+                                    color: varDisabled ? 'var(--muted)' : 'var(--accent)', marginLeft:8, fontWeight:700 }}>
                                     S/{Number(v.precio).toFixed(2)}
                                   </span>
+                                  {varDisabled && (
+                                    <span style={{ background:'rgba(255,77,77,.15)', color:'#ff4d4d',
+                                      fontSize:9, fontWeight:800, padding:'2px 7px',
+                                      borderRadius:20, letterSpacing:1, marginLeft:8 }}>AGOTADO</span>
+                                  )}
                                 </div>
+                                {!varDisabled && (
                                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                                   <button onClick={() => setQty(item.id, vi, v.precio, item.name, v.nombre, item.category, -1)}
                                     style={{ width:30, height:30, borderRadius:'50%',
@@ -347,8 +356,9 @@ export default function Pedido() {
                                       fontSize:18, cursor:'pointer',
                                       display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>+</button>
                                 </div>
+                                )}
                               </div>
-                              {qty > 0 && (
+                              {!varDisabled && qty > 0 && (
                                 <div style={{ padding:'0 12px 8px',
                                   borderBottom: vi < item.variantes.length-1 ? '1px solid var(--border)' : 'none' }}>
                                   <input type="text"
