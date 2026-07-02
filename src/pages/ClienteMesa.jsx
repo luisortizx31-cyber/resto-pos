@@ -116,6 +116,7 @@ export default function ClienteMesa() {
   const [notasPlato, setNotasPlato] = useState({})
   const [showConfirm, setShowConfirm] = useState(false)
   const [catsAbiertas, setCatsAbiertas] = useState({})
+  const [itemsAbiertos, setItemsAbiertos] = useState({})
   const unsubPedidoRef = useRef(null)
 
   // Persistir screen en sesión para restaurar al refrescar
@@ -904,6 +905,7 @@ export default function ClienteMesa() {
                   const totalItemQty  = tieneVariantes
                     ? item.variantes.reduce((a, _, i) => a + getQty(item.id, i), 0)
                     : getQty(item.id, 0)
+                  const itemAbierto = itemsAbiertos[item.id] || false
 
                   return (
                     <div key={item.id} style={{
@@ -913,7 +915,10 @@ export default function ClienteMesa() {
                       transition:'all .15s', opacity: disabled ? 0.55 : 1 }}>
 
                       {/* Cabecera */}
-                      <div style={{ display:'flex', alignItems:'stretch' }}>
+                      <div onClick={() => tieneVariantes && !disabled &&
+                          setItemsAbiertos(prev => ({ ...prev, [item.id]: !itemAbierto }))}
+                        style={{ display:'flex', alignItems:'stretch',
+                          cursor: tieneVariantes && !disabled ? 'pointer' : 'default' }}>
                         {item.fotoUrl ? (
                           <img src={item.fotoUrl} alt={item.name} loading="lazy"
                             style={{ width:80, objectFit:'cover', flexShrink:0,
@@ -933,6 +938,11 @@ export default function ClienteMesa() {
                                 fontSize:9, fontWeight:800, padding:'2px 7px',
                                 borderRadius:20, letterSpacing:1 }}>AGOTADO</span>
                             )}
+                            {tieneVariantes && !disabled && (
+                              <span style={{ fontSize:11, color:'#8b949e', marginLeft:'auto',
+                                transition:'transform .2s',
+                                transform: itemAbierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                            )}
                           </div>
                           {/* Solo mostrar precio si NO tiene variantes */}
                           {!tieneVariantes && (
@@ -941,11 +951,16 @@ export default function ClienteMesa() {
                               S/ {Number(item.price).toFixed(2)}
                             </div>
                           )}
+                          {tieneVariantes && !itemAbierto && (
+                            <div style={{ fontSize:11, color:'#8b949e', marginTop:2 }}>
+                              {item.variantes.length} presentaciones · toca para ver
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* Variantes con botones */}
-                      {!disabled && tieneVariantes && (
+                      {!disabled && tieneVariantes && itemAbierto && (
                         <div style={{ borderTop:'1px solid #21262d' }}>
                           {item.variantes.map((v, vi) => {
                             const key = `${item.id}__${vi}`

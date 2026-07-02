@@ -49,6 +49,7 @@ export default function Delivery() {
   const [deshabilitados, setDeshabilitados] = useState(new Set())
   const [buscar, setBuscar]       = useState('')
   const [catsAbiertas, setCatsAbiertas] = useState({})
+  const [itemsAbiertos, setItemsAbiertos] = useState({})
 
   useEffect(() => {
     if (!restoId) return
@@ -503,6 +504,7 @@ export default function Delivery() {
               const totalItemQty   = tieneVariantes
                 ? item.variantes.reduce((a, _, i) => a + getQty(item.id, i), 0)
                 : getQty(item.id, 0)
+              const itemAbierto = itemsAbiertos[item.id] || false
               return (
                 <div key={item.id} style={{
                   background: disabled ? 'rgba(255,255,255,.02)' : totalItemQty > 0 ? 'rgba(245,166,35,.08)' : '#161b22',
@@ -511,7 +513,10 @@ export default function Delivery() {
                   transition:'all .15s', opacity: disabled ? 0.55 : 1 }}>
 
                   {/* Cabecera item */}
-                  <div style={{ display:'flex', alignItems:'stretch' }}>
+                  <div onClick={() => tieneVariantes && !disabled &&
+                      setItemsAbiertos(prev => ({ ...prev, [item.id]: !itemAbierto }))}
+                    style={{ display:'flex', alignItems:'stretch',
+                      cursor: tieneVariantes && !disabled ? 'pointer' : 'default' }}>
                     {item.fotoUrl ? (
                       <img src={item.fotoUrl} alt={item.name} loading="lazy"
                         style={{ width:80, objectFit:'cover', flexShrink:0,
@@ -531,6 +536,11 @@ export default function Delivery() {
                             fontSize:9, fontWeight:800, padding:'2px 7px',
                             borderRadius:20, letterSpacing:1 }}>AGOTADO</span>
                         )}
+                        {tieneVariantes && !disabled && (
+                          <span style={{ fontSize:11, color:'#8b949e', marginLeft:'auto',
+                            transition:'transform .2s',
+                            transform: itemAbierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                        )}
                       </div>
                       {!tieneVariantes && (
                         <div style={{ color: disabled ? '#8b949e' : '#f5a623',
@@ -538,11 +548,16 @@ export default function Delivery() {
                           S/ {Number(item.price).toFixed(2)}
                         </div>
                       )}
+                      {tieneVariantes && !itemAbierto && (
+                        <div style={{ fontSize:11, color:'#8b949e', marginTop:2 }}>
+                          {item.variantes.length} presentaciones · toca para ver
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Variantes */}
-                  {!disabled && tieneVariantes && (
+                  {!disabled && tieneVariantes && itemAbierto && (
                     <div style={{ borderTop:'1px solid #21262d' }}>
                       {item.variantes.map((v, vi) => {
                         const varDisabled = deshabilitados.has(`${item.id}__${vi}`)

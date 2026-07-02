@@ -26,6 +26,7 @@ export default function Pedido() {
   const [deshabilitados, setDeshabilitados] = useState(new Set())
   const [showConfirm, setShowConfirm] = useState(false)
   const [catsAbiertas, setCatsAbiertas] = useState({})
+  const [itemsAbiertos, setItemsAbiertos] = useState({})
 
   const setNota = (key, val) => {
     setCarrito(prev => prev[key] ? { ...prev, [key]: { ...prev[key], nota: val } } : prev)
@@ -262,6 +263,7 @@ export default function Pedido() {
               const totalItemQty = tieneVariantes
                 ? item.variantes.reduce((a, _, i) => a + getQty(item.id, i), 0)
                 : getQty(item.id, 0)
+              const itemAbierto = itemsAbiertos[item.id] || false
 
               return (
                 <div key={item.id} style={{
@@ -271,7 +273,10 @@ export default function Pedido() {
                   opacity: disabled ? 0.5 : 1, transition:'all .15s' }}>
 
                   {/* Cabecera del item */}
-                  <div style={{ display:'flex', alignItems:'stretch' }}>
+                  <div onClick={() => tieneVariantes && !disabled &&
+                      setItemsAbiertos(prev => ({ ...prev, [item.id]: !itemAbierto }))}
+                    style={{ display:'flex', alignItems:'stretch',
+                      cursor: tieneVariantes && !disabled ? 'pointer' : 'default' }}>
                     {item.fotoUrl ? (
                       <img src={item.fotoUrl} alt={item.name} loading="lazy"
                         style={{ width:72, objectFit:'cover', flexShrink:0,
@@ -296,6 +301,11 @@ export default function Pedido() {
                             fontSize:10, fontWeight:800, padding:'2px 8px',
                             borderRadius:20 }}>{totalItemQty} en carrito</span>
                         )}
+                        {tieneVariantes && !disabled && (
+                          <span style={{ fontSize:11, color:'var(--muted)', marginLeft:'auto',
+                            transition:'transform .2s',
+                            transform: itemAbierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                        )}
                       </div>
 
                       {/* Precio simple */}
@@ -305,11 +315,16 @@ export default function Pedido() {
                           S/ {Number(item.price).toFixed(2)}
                         </div>
                       )}
+                      {tieneVariantes && !itemAbierto && (
+                        <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>
+                          {item.variantes.length} presentaciones · toca para ver
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Variantes o botones simples */}
-                  {!disabled && (
+                  {!disabled && (!tieneVariantes || itemAbierto) && (
                     <div style={{ borderTop: tieneVariantes ? '1px solid var(--border)' : 'none' }}>
                       {tieneVariantes ? (
                         item.variantes.map((v, vi) => {
