@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "$restoId": {
+      "pedidos_activos": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.restoId === $restoId || auth.token.role === 'superadmin')",
+        "$key": {
+          ".write": "!data.exists() || (auth != null && (auth.token.restoId === $restoId || auth.token.role === 'superadmin'))"
+        }
+      },
+      "delivery_pedidos": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.restoId === $restoId || auth.token.role === 'superadmin')",
+        "$key": {
+          ".write": "!data.exists() || (auth != null && (auth.token.restoId === $restoId || auth.token.role === 'superadmin'))"
+        }
+      },
+      "mesas_activas": {
+        ".read": true,
+        ".write": "auth != null && (auth.token.restoId === $restoId || auth.token.role === 'superadmin')"
+      }
+    }
+  }
+}

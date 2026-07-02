@@ -27,10 +27,15 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // Resto de config (categorias, menu deshabilitados, mesas, general) — lectura pública
+      // Resto de config (categorias, menu deshabilitados, mesas, general) — lectura pública.
+      // IMPORTANTE: excluir 'auth' explícitamente — en Firestore Rules, cuando dos
+      // match se solapan en el mismo documento, se otorga acceso si CUALQUIERA de
+      // las reglas que apliquen dice "true" (se combinan con OR, no gana la más
+      // específica). Sin este `cfgId != 'auth'` este bloque volvía a abrir la
+      // lectura de los PINs que el match de arriba bloquea.
       match /config/{cfgId} {
-        allow read: if true;
-        allow write: if request.auth != null &&
+        allow read: if cfgId != 'auth';
+        allow write: if cfgId != 'auth' && request.auth != null &&
           (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
       }
 

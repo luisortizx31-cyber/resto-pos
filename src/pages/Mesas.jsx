@@ -466,7 +466,7 @@ export default function Mesas() {
       </div>
 
       {/* Grid mesas */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:14, padding:'10px 16px 20px' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))', gap:14, padding:'10px 16px 20px' }}>
         {mesasList.map(num => {
           const status = getMesaStatus(num)
           const c = statusColors[status]
