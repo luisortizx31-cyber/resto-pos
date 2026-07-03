@@ -313,20 +313,13 @@ export default function Delivery() {
             padding:14, marginBottom:20 }}>
             <div style={{ fontSize:11, color:'#f5a623', fontWeight:800, letterSpacing:2,
               textTransform:'uppercase', marginBottom:8 }}>Tu pedido</div>
-            {Object.entries(carrito).map(([id, qty]) => {
-              let itemData = null
-              if (menu) for (const items of Object.values(menu)) {
-                const f = items.find(i => i.id === id); if (f) { itemData = f; break }
-              }
-              if (!itemData) return null
-              return (
-                <div key={id} style={{ display:'flex', justifyContent:'space-between',
-                  fontSize:13, color:'#c9d1d9', padding:'3px 0' }}>
-                  <span>×{qty} {itemData.name}</span>
-                  <span style={{ fontFamily:'monospace', color:'#f5a623' }}>S/{(itemData.price * qty).toFixed(2)}</span>
-                </div>
-              )
-            })}
+            {Object.entries(carrito).map(([key, v]) => (
+              <div key={key} style={{ display:'flex', justifyContent:'space-between',
+                fontSize:13, color:'#c9d1d9', padding:'3px 0' }}>
+                <span>×{v.qty} {v.variantName ? `${v.name} (${v.variantName})` : v.name}</span>
+                <span style={{ fontFamily:'monospace', color:'#f5a623' }}>S/{(v.price * v.qty).toFixed(2)}</span>
+              </div>
+            ))}
             <div style={{ display:'flex', justifyContent:'space-between',
               fontWeight:800, fontSize:16, marginTop:10, paddingTop:8, borderTop:'1px solid #30363d' }}>
               <span>Total</span>
