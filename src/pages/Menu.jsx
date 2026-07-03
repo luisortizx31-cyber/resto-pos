@@ -21,6 +21,10 @@ export default function Menu() {
   const [catsAbiertas, setCatsAbiertas] = useState({})
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const fileInputRef = useRef(null)
+  const [destacados, setDestacados] = useState([])
+  const [subiendoDestacadoIdx, setSubiendoDestacadoIdx] = useState(null)
+  const destacadoFileInputRef = useRef(null)
+  const destacadoIdxRef = useRef(null)
 
   const handleFotoFile = async (e) => {
     const file = e.target.files?.[0]
@@ -83,6 +87,56 @@ export default function Menu() {
     await saveCategories(nueva)
   }
 
+  // ── Destacados (carrusel arriba del menú) ──────────────────────
+  const MAX_DESTACADOS = 6
+  const loadDestacados = async () => {
+    try {
+      const snap = await getDoc(doc(db, 'restaurantes', restoId, 'config', 'destacados'))
+      if (snap.exists() && snap.data().lista?.length) return snap.data().lista
+    } catch {}
+    return []
+  }
+  const saveDestacados = async (lista) => {
+    await setDoc(doc(db, 'restaurantes', restoId, 'config', 'destacados'), { lista })
+  }
+  const agregarDestacado = async () => {
+    if (destacados.length >= MAX_DESTACADOS) { showToast(`Máximo ${MAX_DESTACADOS} destacados`, 'error'); return }
+    const nueva = [...destacados, { fotoUrl:'', categoria: categories[0] || '', label:'' }]
+    setDestacados(nueva)
+    await saveDestacados(nueva)
+  }
+  const actualizarDestacado = async (idx, campo, val) => {
+    const nueva = destacados.map((d, i) => i === idx ? { ...d, [campo]: val } : d)
+    setDestacados(nueva)
+    await saveDestacados(nueva)
+  }
+  const eliminarDestacado = async (idx) => {
+    const nueva = destacados.filter((_, i) => i !== idx)
+    setDestacados(nueva)
+    await saveDestacados(nueva)
+  }
+  const abrirSelectorFotoDestacado = (idx) => {
+    destacadoIdxRef.current = idx
+    destacadoFileInputRef.current?.click()
+  }
+  const handleFotoDestacado = async (e) => {
+    const file = e.target.files?.[0]
+    const idx  = destacadoIdxRef.current
+    e.target.value = ''
+    if (!file || idx == null) return
+    if (!file.type.startsWith('image/')) { showToast('Elige un archivo de imagen', 'error'); return }
+    setSubiendoDestacadoIdx(idx)
+    try {
+      const url = await subirFotoMenu(restoId, `destacado_${idx}`, file)
+      await actualizarDestacado(idx, 'fotoUrl', url)
+      showToast('✅ Foto subida')
+    } catch (e) {
+      console.error(e)
+      showToast('Error al subir la foto', 'error')
+    }
+    setSubiendoDestacadoIdx(null)
+  }
+
   // ── Platos ──────────────────────────────────────────────────────
   const load = async () => {
     setLoading(true)
@@ -99,6 +153,7 @@ export default function Menu() {
       setForm(f => ({ ...f, category: cats[0] || '' }))
     })
     load()
+    loadDestacados().then(setDestacados)
     // Platos deshabilitados
     getDoc(doc(db, 'restaurantes', restoId, 'config', 'menu')).then(snap => {
       if (snap.exists()) setDeshabilitados(new Set(snap.data().deshabilitados || []))
@@ -217,7 +272,7 @@ export default function Menu() {
       </div>
 
       <div style={{ display:'flex', borderBottom:'1px solid var(--border)' }}>
-        {[['platos','🍽 Platos'],['categorias','🏷 Categorías']].map(([t,l]) => (
+        {[['platos','🍽 Platos'],['categorias','🏷 Categorías'],['destacados','⭐ Destacados']].map(([t,l]) => (
           <button key={t} onClick={() => setTabMenu(t)} style={{
             flex:1, padding:'13px 0', background:'none', border:'none',
             borderBottom: tabMenu===t ? '2px solid var(--accent)' : '2px solid transparent',
@@ -535,6 +590,71 @@ export default function Menu() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── DESTACADOS ── */}
+      {tabMenu === 'destacados' && (
+        <div style={{ padding:'16px' }}>
+          <div style={{ fontSize:12, color:'var(--muted)', marginBottom:16, lineHeight:1.6 }}>
+            Estas fotos aparecen en un carrusel arriba de las categorías en la pantalla de Pedido.
+            Al tocar una foto, el mesero salta directo a esa categoría. Máximo {MAX_DESTACADOS}.
+          </div>
+          <input ref={destacadoFileInputRef} type="file" accept="image/*"
+            onChange={handleFotoDestacado} style={{ display:'none' }} />
+          {destacados.map((d, idx) => (
+            <div key={idx} style={{ background:'var(--card)', border:'1.5px solid var(--border)',
+              borderRadius:14, padding:14, marginBottom:12 }}>
+              <div style={{ display:'flex', gap:12 }}>
+                {d.fotoUrl ? (
+                  <img src={d.fotoUrl} alt="destacado"
+                    style={{ width:80, height:80, objectFit:'cover', borderRadius:12,
+                      border:'2px solid var(--accent)', flexShrink:0 }}
+                    onError={e => e.target.style.display='none'} />
+                ) : (
+                  <div style={{ width:80, height:80, background:'var(--surface)', borderRadius:12,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:26, flexShrink:0, color:'var(--border)' }}>⭐</div>
+                )}
+                <div style={{ flex:1 }}>
+                  <button type="button" className="btn btn-primary"
+                    style={{ width:'100%', padding:'8px 0', fontSize:12, marginBottom:8 }}
+                    disabled={subiendoDestacadoIdx === idx}
+                    onClick={() => abrirSelectorFotoDestacado(idx)}>
+                    {subiendoDestacadoIdx === idx ? '⏳ SUBIENDO...' : '📷 SUBIR FOTO'}
+                  </button>
+                  <input className="input" placeholder="Texto opcional (ej: Combos)"
+                    value={d.label || ''}
+                    onChange={e => actualizarDestacado(idx, 'label', e.target.value)}
+                    style={{ marginBottom:0, padding:'8px 10px', fontSize:12 }} />
+                </div>
+              </div>
+              <div style={{ marginTop:10 }}>
+                <div className="section-label" style={{ marginBottom:6 }}>Va a la categoría</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {categories.map(cat => (
+                    <button key={cat} onClick={() => actualizarDestacado(idx, 'categoria', cat)} style={{
+                      background: d.categoria===cat ? 'var(--accent)' : 'var(--surface)',
+                      border:`1.5px solid ${d.categoria===cat ? 'var(--accent)' : 'var(--border)'}`,
+                      color: d.categoria===cat ? '#111' : 'var(--muted2)',
+                      borderRadius:20, padding:'5px 12px', fontSize:12,
+                      fontWeight:700, cursor:'pointer', fontFamily:'var(--font)' }}>{cat}</button>
+                  ))}
+                </div>
+              </div>
+              <button className="btn btn-danger" style={{ width:'100%', padding:10, marginTop:10, fontSize:12 }}
+                onClick={() => eliminarDestacado(idx)}>🗑 Eliminar</button>
+            </div>
+          ))}
+          {destacados.length < MAX_DESTACADOS && (
+            <button onClick={agregarDestacado}
+              style={{ width:'100%', background:'rgba(245,166,35,.08)',
+                border:'1.5px dashed rgba(245,166,35,.4)', borderRadius:14,
+                color:'var(--accent)', padding:'14px 0', fontSize:13,
+                fontWeight:700, cursor:'pointer' }}>
+              + Agregar destacado
+            </button>
+          )}
         </div>
       )}
     </div>

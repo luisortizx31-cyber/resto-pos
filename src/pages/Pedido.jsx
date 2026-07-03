@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { db, rtdb } from '../lib/firebase'
 import { collection, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore'
@@ -27,6 +27,15 @@ export default function Pedido() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [catsAbiertas, setCatsAbiertas] = useState({})
   const [itemsAbiertos, setItemsAbiertos] = useState({})
+  const [destacados, setDestacados] = useState([])
+  const catRefs = useRef({})
+
+  const irACategoria = (categoria) => {
+    setCatsAbiertas(prev => ({ ...prev, [categoria]: true }))
+    setTimeout(() => {
+      catRefs.current[categoria]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
 
   const setNota = (key, val) => {
     setCarrito(prev => prev[key] ? { ...prev, [key]: { ...prev[key], nota: val } } : prev)
@@ -67,6 +76,13 @@ export default function Pedido() {
       if (snap.exists()) setDeshabilitados(new Set(snap.data().deshabilitados || []))
     })
     return () => unsub()
+  }, [restoId])
+
+  useEffect(() => {
+    if (!restoId) return
+    getDoc(doc(db, 'restaurantes', restoId, 'config', 'destacados')).then(snap => {
+      if (snap.exists()) setDestacados(snap.data().lista || [])
+    }).catch(() => {})
   }, [restoId])
 
   // Helpers carrito
@@ -191,6 +207,26 @@ export default function Pedido() {
         </div>
       </div>
 
+      {/* Carrusel de destacados */}
+      {destacados.length > 0 && !buscar.trim() && (
+        <div style={{ display:'flex', gap:10, overflowX:'auto', padding:'6px 16px 14px',
+          WebkitOverflowScrolling:'touch' }}>
+          {destacados.filter(d => d.fotoUrl).map((d, idx) => (
+            <div key={idx} onClick={() => irACategoria(d.categoria)}
+              style={{ flexShrink:0, width:110, cursor:'pointer' }}>
+              <img src={d.fotoUrl} alt={d.label || d.categoria} loading="lazy"
+                style={{ width:110, height:90, objectFit:'cover', borderRadius:14,
+                  border:'2px solid var(--accent)', display:'block' }} />
+              {d.label && (
+                <div style={{ textAlign:'center', fontSize:11, fontWeight:700,
+                  color:'var(--accent)', marginTop:4, whiteSpace:'nowrap',
+                  overflow:'hidden', textOverflow:'ellipsis' }}>{d.label}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {!menu ? (
         <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Cargando menú...</div>
       ) : (() => {
@@ -222,7 +258,7 @@ export default function Pedido() {
           }, 0)
 
           return (
-          <div key={cat} style={{ marginBottom:6 }}>
+          <div key={cat} ref={el => { catRefs.current[cat] = el }} style={{ marginBottom:6 }}>
             {/* Header acordeón */}
             <div onClick={() => setCatsAbiertas(prev => ({ ...prev, [cat]: !abierta }))}
               style={{
