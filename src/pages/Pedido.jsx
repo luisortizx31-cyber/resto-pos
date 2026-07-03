@@ -352,7 +352,7 @@ export default function Pedido() {
                         </div>
                       )}
                       {tieneVariantes && !itemAbierto && (
-                        <div style={{ fontSize:12, color:'var(--accent)', fontWeight:800,
+                        <div style={{ fontSize:12, color:'var(--muted2)', fontWeight:800,
                           marginTop:3 }}>
                           👉 {item.variantes.length} presentaciones · toca para ver
                         </div>

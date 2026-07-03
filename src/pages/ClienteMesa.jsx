@@ -117,7 +117,16 @@ export default function ClienteMesa() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [catsAbiertas, setCatsAbiertas] = useState({})
   const [itemsAbiertos, setItemsAbiertos] = useState({})
+  const [destacados, setDestacados] = useState([])
   const unsubPedidoRef = useRef(null)
+  const catRefs = useRef({})
+
+  const irACategoria = (categoria) => {
+    setCatsAbiertas(prev => ({ ...prev, [categoria]: true }))
+    setTimeout(() => {
+      catRefs.current[categoria]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
 
   // Persistir screen en sesión para restaurar al refrescar
   useEffect(() => {
@@ -157,6 +166,9 @@ export default function ClienteMesa() {
       } catch { setMenu({}) }
     }
     loadMenu()
+    getDoc(doc(db, 'restaurantes', restoId, 'config', 'destacados')).then(snap => {
+      if (snap.exists()) setDestacados(snap.data().lista || [])
+    }).catch(() => {})
   }, [restoId])
 
   const unsubRestoRef = useRef(null)
@@ -853,6 +865,26 @@ export default function ClienteMesa() {
               </div>
             </div>
 
+            {/* Carrusel de destacados */}
+            {destacados.length > 0 && !buscar.trim() && (
+              <div style={{ display:'flex', gap:10, overflowX:'auto', padding:'0 16px 14px',
+                WebkitOverflowScrolling:'touch' }}>
+                {destacados.filter(d => d.fotoUrl).map((d, idx) => (
+                  <div key={idx} onClick={() => irACategoria(d.categoria)}
+                    style={{ flexShrink:0, width:110, cursor:'pointer' }}>
+                    <img src={d.fotoUrl} alt={d.label || d.categoria} loading="lazy"
+                      style={{ width:110, height:90, objectFit:'cover', borderRadius:14,
+                        border:'2px solid #f5a623', display:'block' }} />
+                    {d.label && (
+                      <div style={{ textAlign:'center', fontSize:11, fontWeight:700,
+                        color:'#f5a623', marginTop:4, whiteSpace:'nowrap',
+                        overflow:'hidden', textOverflow:'ellipsis' }}>{d.label}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {q && Object.keys(menuFiltrado).length === 0 ? (
               <div style={{ textAlign:'center', padding:40, color:'#8b949e' }}>
                 <div style={{ fontSize:36, marginBottom:10 }}>🔍</div>
@@ -867,7 +899,7 @@ export default function ClienteMesa() {
                   : getQty(item.id, 0))
               }, 0)
               return (
-              <div key={cat} style={{ marginBottom:6 }}>
+              <div key={cat} ref={el => { catRefs.current[cat] = el }} style={{ marginBottom:6 }}>
                 <div onClick={() => setCatsAbiertas(prev => ({ ...prev, [cat]: !abierta }))}
                   style={{
                     margin:'6px 12px 0',
@@ -952,8 +984,8 @@ export default function ClienteMesa() {
                             </div>
                           )}
                           {tieneVariantes && !itemAbierto && (
-                            <div style={{ fontSize:11, color:'#8b949e', marginTop:2 }}>
-                              {item.variantes.length} presentaciones · toca para ver
+                            <div style={{ fontSize:12, color:'#c9d1d9', fontWeight:800, marginTop:3 }}>
+                              👉 {item.variantes.length} presentaciones · toca para ver
                             </div>
                           )}
                         </div>

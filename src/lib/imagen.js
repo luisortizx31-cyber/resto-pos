@@ -35,6 +35,9 @@ export async function subirFotoMenu(restoId, itemId, file) {
   if (!blob) throw new Error('No se pudo procesar la imagen')
   const nombre = `${itemId || Date.now()}_${Math.random().toString(36).slice(2, 7)}.webp`
   const storageRef = ref(storage, `restaurantes/${restoId}/menu/${nombre}`)
-  await uploadBytes(storageRef, blob, { contentType: 'image/webp' })
+  await uploadBytes(storageRef, blob, {
+    contentType: 'image/webp',
+    cacheControl: 'public, max-age=2592000, immutable',
+  })
   return getDownloadURL(storageRef)
 }
