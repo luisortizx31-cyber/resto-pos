@@ -325,16 +325,6 @@ export default function Cocina() {
             fontFamily:'var(--font)', marginBottom:-2 }}>
           🔥 PENDIENTES {totalPendientes>0?`(${totalPendientes})`:''}
         </button>
-        {tieneDelivery && (
-          <button onClick={() => setTab('delivery')}
-            style={{ flex:1, padding:'12px 0', background:'none', border:'none',
-              borderBottom: tab==='delivery'?'3px solid var(--blue)':'3px solid transparent',
-              color: tab==='delivery'?'var(--blue)':'var(--muted)',
-              fontWeight:800, fontSize:13, letterSpacing:2, cursor:'pointer',
-              fontFamily:'var(--font)', marginBottom:-2 }}>
-            🛵 DELIVERY
-          </button>
-        )}
         <button onClick={() => setTab('entregados')}
           style={{ flex:1, padding:'12px 0', background:'none', border:'none',
             borderBottom: tab==='entregados'?'3px solid var(--green)':'3px solid transparent',
@@ -343,6 +333,16 @@ export default function Cocina() {
             fontFamily:'var(--font)', marginBottom:-2 }}>
           ✅ ENTREGADOS {totalEntregados>0?`(${totalEntregados})`:''}
         </button>
+        {tieneDelivery && (
+          <button onClick={() => setTab('delivery')}
+            style={{ flex:1, padding:'12px 0', background:'none', border:'none',
+              borderBottom: tab==='delivery'?'3px solid var(--blue)':'3px solid transparent',
+              color:'var(--blue)',
+              fontWeight:800, fontSize:13, letterSpacing:2, cursor:'pointer',
+              fontFamily:'var(--font)', marginBottom:-2 }}>
+            🛵 DELIVERY
+          </button>
+        )}
       </div>
 
       {tab==='pendientes' && (
