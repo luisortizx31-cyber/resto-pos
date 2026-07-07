@@ -1180,6 +1180,9 @@ export default function ClienteMesa() {
                         {v.variantName ? `${v.name} (${v.variantName})` : v.name}
                       </span>
                     </div>
+                    <div style={{ fontSize:12.5, color:'#c9d1d9', fontWeight:600, marginTop:3, marginLeft:32 }}>
+                      S/{Number(v.price).toFixed(2)} c/u
+                    </div>
                     {(v.nota || notasPlato[v.id]) && (
                       <div style={{ fontSize:11, color:'#f5c842', marginTop:4, marginLeft:32,
                         background:'rgba(245,200,66,.08)', borderRadius:6,

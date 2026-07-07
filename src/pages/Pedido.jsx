@@ -565,6 +565,9 @@ export default function Pedido() {
                         {v.variantName ? `${v.name} (${v.variantName})` : v.name}
                       </span>
                     </div>
+                    <div style={{ fontSize:12.5, color:'var(--muted)', fontWeight:600, marginTop:3, marginLeft:32 }}>
+                      S/{Number(v.price).toFixed(2)} c/u
+                    </div>
                     {v.nota && (
                       <div style={{ fontSize:11, color:'var(--yellow)', marginTop:4, marginLeft:32,
                         background:'rgba(245,200,66,.08)', borderRadius:6,
