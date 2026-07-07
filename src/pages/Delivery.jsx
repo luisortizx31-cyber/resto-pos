@@ -320,9 +320,16 @@ export default function Delivery() {
                 <span style={{ fontFamily:'monospace', color:'#f5a623' }}>S/{(v.price * v.qty).toFixed(2)}</span>
               </div>
             ))}
-            <div style={{ display:'flex', justifyContent:'space-between',
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
               fontWeight:800, fontSize:16, marginTop:10, paddingTop:8, borderTop:'1px solid #30363d' }}>
-              <span>Total</span>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span>Total</span>
+                <button onClick={() => setScreen('carta')}
+                  style={{ background:'rgba(245,166,35,.15)', border:'1.5px solid #f5a623',
+                    color:'#f5a623', borderRadius:20, padding:'4px 10px', fontSize:11,
+                    fontWeight:800, cursor:'pointer', letterSpacing:0.5,
+                    fontFamily:"'Inter',system-ui,sans-serif" }}>+ Agregar más</button>
+              </div>
               <span style={{ color:'#27c97a', fontFamily:'monospace' }}>S/{totalPrice.toFixed(2)}</span>
             </div>
           </div>
@@ -333,7 +340,7 @@ export default function Delivery() {
             ['referencia','📌 Referencia (opcional)','Ej: frente al parque, casa azul']
           ].map(([k, l, p]) => (
             <div key={k} style={{ marginBottom:14 }}>
-              <div style={{ fontSize:11, color:'#8b949e', letterSpacing:2,
+              <div style={{ fontSize:12.5, color:'#f5a623', fontWeight:800, letterSpacing:1.5,
                 textTransform:'uppercase', marginBottom:6 }}>{l}</div>
               <input value={formData[k]} onChange={e => setFormData(f => ({ ...f, [k]: e.target.value }))}
                 placeholder={p}
