@@ -517,7 +517,7 @@ export default function ClienteMesa() {
 
     const generarMensajeWsp = (tel) => {
       const lineas = itemsParaBoleta.map(i =>
-        `• ${i.qty}x ${i.name.padEnd(18)} S/${(i.price * i.qty).toFixed(2)}`
+        `• ${i.qty}x ${i.name} (S/${Number(i.price).toFixed(2)} c/u) = S/${(i.price * i.qty).toFixed(2)}`
       ).join('\n')
       const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
       const msg = [
@@ -746,7 +746,7 @@ export default function ClienteMesa() {
                             ✏️ {item.nota}
                           </div>
                         )}
-                        <div style={{ fontSize:12, color:'#8b949e', marginTop:3, marginLeft:32 }}>
+                        <div style={{ fontSize:13, color:'#c9d1d9', fontWeight:600, marginTop:3, marginLeft:32 }}>
                           S/{Number(item.price).toFixed(2)} c/u
                         </div>
                       </div>

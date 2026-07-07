@@ -226,6 +226,9 @@ export default function Cocina() {
                     alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>×{item.qty}</div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontWeight:600, fontSize:14 }}>{item.name}</div>
+                    <div style={{ fontSize:12, color:'var(--muted)', fontWeight:600, marginTop:2 }}>
+                      S/{Number(item.price).toFixed(2)} c/u
+                    </div>
                     {item.nota && (
                       <div style={{ fontSize:11, color:'var(--yellow)', marginTop:3,
                         background:'rgba(245,200,66,.08)', borderRadius:6,

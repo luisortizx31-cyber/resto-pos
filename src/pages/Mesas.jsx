@@ -794,7 +794,7 @@ export default function Mesas() {
                             wordBreak:'break-word' }}>
                             {esBebida ? '🥤 ' : ''}{item.name}
                           </div>
-                          <div style={{ fontSize:11, color:'var(--muted)' }}>
+                          <div style={{ fontSize:13, color:'var(--text)', fontWeight:600, marginTop:2 }}>
                             S/{Number(item.price).toFixed(2)} c/u
                           </div>
                         </div>

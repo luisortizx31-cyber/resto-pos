@@ -315,8 +315,15 @@ export default function Delivery() {
               textTransform:'uppercase', marginBottom:8 }}>Tu pedido</div>
             {Object.entries(carrito).map(([key, v]) => (
               <div key={key} style={{ display:'flex', justifyContent:'space-between',
-                fontSize:13, color:'#c9d1d9', padding:'3px 0' }}>
-                <span>×{v.qty} {v.variantName ? `${v.name} (${v.variantName})` : v.name}</span>
+                alignItems:'flex-start', padding:'5px 0' }}>
+                <div>
+                  <div style={{ fontSize:13, color:'#c9d1d9' }}>
+                    ×{v.qty} {v.variantName ? `${v.name} (${v.variantName})` : v.name}
+                  </div>
+                  <div style={{ fontSize:12, color:'#8b949e', fontWeight:600, marginTop:2 }}>
+                    S/{Number(v.price).toFixed(2)} c/u
+                  </div>
+                </div>
                 <span style={{ fontFamily:'monospace', color:'#f5a623' }}>S/{(v.price * v.qty).toFixed(2)}</span>
               </div>
             ))}
