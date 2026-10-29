@@ -3,7 +3,6 @@ import { db, functions } from '../lib/firebase'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { useSession, useToast } from '../components/Layout'
-import { obtenerInfoLogin } from '../lib/auth'
 
 const gestionarAuthResto = httpsCallable(functions, 'gestionarAuthResto')
 
@@ -21,14 +20,16 @@ export default function Config() {
   const [saving, setSaving]   = useState(false)
   const [loading, setLoading] = useState(true)
   const [confirmEliminarId, setConfirmEliminarId] = useState(null)
+  const [pinVisible, setPinVisible] = useState({})
 
   useEffect(() => { if (restoId) loadConfig() }, [restoId])
 
   const loadConfig = async () => {
     setLoading(true)
     try {
-      const info = await obtenerInfoLogin(restoId)
-      if (info.ok) setRepartidores(info.repartidores || [])
+      // Solo el dueño recibe celular + PIN de los repartidores
+      const res = await gestionarAuthResto({ restoId, accion: 'listRepartidores' })
+      if (res.data.ok) setRepartidores(res.data.repartidores || [])
       const restoSnap = await getDoc(doc(db, 'restaurantes', restoId))
       if (restoSnap.exists()) {
         setWhatsapp(restoSnap.data().whatsapp || '')
@@ -207,7 +208,12 @@ export default function Config() {
                     <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>📱 {r.celular}</div>
                   )}
                   <div style={{ fontSize:11, color:'var(--muted)', marginTop:2, fontFamily:'var(--mono)' }}>
-                    PIN: {'●'.repeat(r.pin?.length||4)}
+                    PIN: {pinVisible[r.id] ? (r.pin || '—') : '●'.repeat(r.pin?.length||4)}
+                    <button onClick={() => setPinVisible(v => ({ ...v, [r.id]: !v[r.id] }))}
+                      style={{ background:'none', border:'none', cursor:'pointer', fontSize:13,
+                        marginLeft:6, padding:0, color:'var(--muted)' }}>
+                      {pinVisible[r.id] ? '🙈' : '👁'}
+                    </button>
                   </div>
                 </div>
                 <button onClick={() => setConfirmEliminarId(r.id)}

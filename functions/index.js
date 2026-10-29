@@ -145,6 +145,16 @@ exports.gestionarAuthResto = onCall(async (request) => {
     return { ok: true }
   }
 
+  if (accion === 'listRepartidores') {
+    if (!esDuenoDeEsteResto) throw new HttpsError('permission-denied', 'No autorizado')
+    const auth = await getAuthDoc(restoId)
+    if (!auth.exists) throw new HttpsError('not-found', 'Restaurante no encontrado')
+    const repartidores = (auth.data.repartidores || []).map(r => ({
+      id: r.id, nombre: r.nombre, celular: r.celular || r.telefono || '', pin: r.pin || '',
+    }))
+    return { ok: true, repartidores }
+  }
+
   if (accion === 'addRepartidor') {
     if (!esDuenoDeEsteResto) throw new HttpsError('permission-denied', 'No autorizado')
     const nombre = String(payload.nombre || '').trim()
