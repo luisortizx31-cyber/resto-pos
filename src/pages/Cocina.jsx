@@ -152,10 +152,12 @@ export default function Cocina() {
 
   const byMesaPending = groupByMesa(pendingOrders)
   const byMesaListo   = groupByMesa(listoOrders)
-  // Pedidos de solo bebidas: se muestran como referencia en la tarjeta de su mesa
+  // Pedidos de solo bebidas: se muestran como referencia en la tarjeta de su mesa;
+  // si la mesa no tiene comida, tienen su propia tarjeta según su estado
   soloBebidasOrders.sort((a,b) => new Date(a.timeISO)-new Date(b.timeISO)).forEach(o => {
-    const destino = byMesaPending[o.mesa] || byMesaListo[o.mesa]
-    if (destino) destino.push({ ...o, soloReferencia: true })
+    const grupo = o.status === 'pending' ? byMesaPending : byMesaListo
+    const destino = byMesaPending[o.mesa] || byMesaListo[o.mesa] || (grupo[o.mesa] = [])
+    destino.push({ ...o, soloReferencia: true })
   })
   const mesasPending  = Object.entries(byMesaPending).sort(([,a],[,b]) => {
     const oa = a.reduce((m,o)=>!m||new Date(o.timeISO)<new Date(m)?o.timeISO:m, null)

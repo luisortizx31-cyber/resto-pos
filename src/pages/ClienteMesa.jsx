@@ -173,6 +173,23 @@ export default function ClienteMesa() {
 
   const unsubRestoRef = useRef(null)
 
+  // ── 1a. En pantalla gracias: saber si el mesero volvió a abrir el QR de la mesa ──
+  const [qrReabierto, setQrReabierto] = useState(false)
+  useEffect(() => {
+    if (screen !== 'gracias') return
+    const unsub = onSnapshot(doc(db, 'restaurantes', restoId), snap => {
+      const rd = snap.exists() ? snap.data() : {}
+      setQrReabierto(!(rd.qrActivo === false || (Array.isArray(rd.qrMesasOff) && rd.qrMesasOff.includes(mesaNum))))
+    })
+    return () => unsub()
+  }, [screen, restoId, mesaNum])
+
+  const nuevoPedido = () => {
+    limpiarCobradoEnSession(mesaKey)
+    sessionStorage.removeItem('gastro_boleta_' + mesaKey)
+    window.location.reload()
+  }
+
   // ── 1b. Escuchar platos deshabilitados en tiempo real ───────────
   useEffect(() => {
     if (!restoId) return
@@ -563,9 +580,18 @@ export default function ClienteMesa() {
           <div style={{ fontWeight:800, fontSize:14, color:'#f5a623', letterSpacing:1, marginBottom:6 }}>
             ¿Deseas ordenar de nuevo?
           </div>
-          <div style={{ fontSize:13, color:'#8b949e', lineHeight:1.6 }}>
-            Escanea el código QR de la mesa nuevamente para iniciar una nueva sesión.
-          </div>
+          {qrReabierto ? (
+            <button onClick={nuevoPedido}
+              style={{ background:'linear-gradient(135deg,#f5a623,#e8521a)', color:'#111',
+                border:'none', borderRadius:12, padding:'12px 20px', marginTop:4,
+                fontSize:14, fontWeight:900, cursor:'pointer', letterSpacing:1 }}>
+              🍽 Hacer un nuevo pedido
+            </button>
+          ) : (
+            <div style={{ fontSize:13, color:'#8b949e', lineHeight:1.6 }}>
+              Escanea el código QR de la mesa nuevamente para iniciar una nueva sesión.
+            </div>
+          )}
         </div>
         <div style={{ background:'#161b22', border:'1px solid #30363d',
           borderRadius:12, padding:'10px 20px', fontSize:12, color:'#8b949e' }}>
