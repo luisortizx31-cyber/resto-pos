@@ -573,7 +573,7 @@ export default function Mesas() {
               {/* Header fijo */}
               <div style={{
                 background: pedido?.soloBebidas ? 'linear-gradient(135deg,#0d2a1a,#0a1f12)' : 'linear-gradient(135deg,#1a2a4a,#0d1a35)',
-                padding:'20px 22px 16px', textAlign:'center', flexShrink:0,
+                padding:'12px 22px 10px', textAlign:'center', flexShrink:0,
                 borderRadius:'18px 18px 0 0',
                 borderBottom:`2px solid ${pedido?.soloBebidas ? 'var(--green)' : 'var(--blue)'}` }}>
                 <div style={{ fontSize:11, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff',
@@ -588,15 +588,17 @@ export default function Mesas() {
                     🥤 SOLO BEBIDAS — NO VA A COCINA
                   </div>
                 )}
-                <div style={{ fontSize:80, fontWeight:900, lineHeight:1, color:'white',
-                  fontFamily:'var(--mono)',
-                  textShadow: pedido?.soloBebidas ? '0 0 40px rgba(39,201,122,.6)' : '0 0 40px rgba(74,158,255,.6)' }}>
-                  {pedido?.mesa}
-                </div>
-                <div style={{ fontSize:13, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff',
-                  fontWeight:700, letterSpacing:3, marginTop:2 }}>MESA</div>
-                <div style={{ fontSize:12, color:'var(--muted)', marginTop:6 }}>
-                  {pedido?.timeISO ? new Date(pedido.timeISO).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) : ''}
+                <div style={{ display:'flex', alignItems:'baseline', justifyContent:'center', gap:10 }}>
+                  <span style={{ fontSize:13, color: pedido?.soloBebidas ? 'var(--green)' : '#4a9eff',
+                    fontWeight:700, letterSpacing:3 }}>MESA</span>
+                  <span style={{ fontSize:38, fontWeight:900, lineHeight:1, color:'white',
+                    fontFamily:'var(--mono)',
+                    textShadow: pedido?.soloBebidas ? '0 0 20px rgba(39,201,122,.6)' : '0 0 20px rgba(74,158,255,.6)' }}>
+                    {pedido?.mesa}
+                  </span>
+                  <span style={{ fontSize:12, color:'var(--muted)' }}>
+                    {pedido?.timeISO ? new Date(pedido.timeISO).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}) : ''}
+                  </span>
                 </div>
               </div>
 

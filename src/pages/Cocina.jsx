@@ -127,16 +127,17 @@ export default function Cocina() {
     setTogglingDelivery(false)
   }
 
-  // Separar pedidos
-  const pendingOrders = {}, listoOrders = {}
+  const esBebida = (i) => BEBIDAS_CAT.includes((i.category || '').toLowerCase().trim())
+
+  // Separar pedidos — las bebidas se conservan como referencia (no se preparan aquí)
+  const pendingOrders = {}, listoOrders = {}, soloBebidasOrders = []
   Object.entries(orders).forEach(([key, order]) => {
-    const itemsCocina = (order.items || []).filter(item =>
-      !BEBIDAS_CAT.includes((item.category || '').toLowerCase().trim())
-    )
-    if (itemsCocina.length === 0 && !order.extras) return
-    const enriched = { key, ...order, items: itemsCocina }
-    if (order.status === 'listo')    listoOrders[key]   = enriched
-    else if (order.status === 'pending') pendingOrders[key] = enriched
+    if (order.status !== 'listo' && order.status !== 'pending') return
+    const items = order.items || []
+    const enriched = { key, ...order, items }
+    if (!items.some(i => !esBebida(i)) && !order.extras) { soloBebidasOrders.push(enriched); return }
+    if (order.status === 'listo') listoOrders[key]   = enriched
+    else                          pendingOrders[key] = enriched
   })
 
   const groupByMesa = (obj) => {
@@ -151,6 +152,11 @@ export default function Cocina() {
 
   const byMesaPending = groupByMesa(pendingOrders)
   const byMesaListo   = groupByMesa(listoOrders)
+  // Pedidos de solo bebidas: se muestran como referencia en la tarjeta de su mesa
+  soloBebidasOrders.sort((a,b) => new Date(a.timeISO)-new Date(b.timeISO)).forEach(o => {
+    const destino = byMesaPending[o.mesa] || byMesaListo[o.mesa]
+    if (destino) destino.push({ ...o, soloReferencia: true })
+  })
   const mesasPending  = Object.entries(byMesaPending).sort(([,a],[,b]) => {
     const oa = a.reduce((m,o)=>!m||new Date(o.timeISO)<new Date(m)?o.timeISO:m, null)
     const ob = b.reduce((m,o)=>!m||new Date(o.timeISO)<new Date(m)?o.timeISO:m, null)
@@ -168,9 +174,10 @@ export default function Cocina() {
 
   const renderMesaCard = (mesa, mesaOrders, isListo) => {
     const allItems  = mesaOrders.flatMap(o => o.items || [])
-    // Total incluye bebidas aunque no se muestren
+    // Total incluye bebidas (se muestran solo como referencia)
     const totalMesa = allItems.reduce((a,i) => a+i.price*i.qty, 0)
       + mesaOrders.reduce((a,o) => a+(o.extrasPrice||0), 0)
+    const ordersCocina = mesaOrders.filter(o => !o.soloReferencia)
     return (
       <div key={mesa} style={{ background:'var(--card)',
         border:`2px solid ${isListo?'var(--green)':'var(--accent)'}`,
@@ -189,31 +196,45 @@ export default function Cocina() {
               <div style={{ fontFamily:'var(--mono)', fontSize:14, color:'var(--accent)', fontWeight:700, marginTop:2 }}>
                 S/{totalMesa.toFixed(2)}
               </div>
-              {mesaOrders.length > 1 && (
+              {ordersCocina.length > 1 && (
                 <div style={{ fontSize:10, color:'var(--blue)', fontWeight:800, marginTop:2 }}>
-                  {mesaOrders.length} pedidos acumulados
+                  {ordersCocina.length} pedidos acumulados
                 </div>
               )}
             </div>
           </div>
-          {!isListo ? <Timer timeISO={mesaOrders[0]?.timeISO} /> : <div style={{ fontSize:32 }}>✅</div>}
+          {!isListo ? <Timer timeISO={ordersCocina[0]?.timeISO} /> : <div style={{ fontSize:32 }}>✅</div>}
         </div>
         <div style={{ padding:'12px 18px' }}>
-          {mesaOrders.map((order, oi) => {
-            // Filtrar bebidas para cocina — no se preparan aquí
-            const itemsCocina = (order.items||[]).filter(i =>
-              !BEBIDAS_CAT.includes((i.category||'').toLowerCase().trim())
+          {mesaOrders.map((order) => {
+            // Bebidas no se preparan aquí: se listan aparte como referencia
+            const itemsCocina = (order.items||[]).filter(i => !esBebida(i))
+            const bebidas     = (order.items||[]).filter(esBebida)
+            const bloqueBebidas = bebidas.length > 0 && (
+              <div style={{ background:'rgba(74,158,255,.06)', border:'1px dashed rgba(74,158,255,.3)',
+                borderRadius:10, padding:'6px 12px', marginTop:8 }}>
+                <div style={{ fontSize:9, color:'var(--blue)', letterSpacing:2,
+                  textTransform:'uppercase', fontWeight:800, marginBottom:2 }}>🥤 Bebidas · solo referencia</div>
+                {bebidas.map((item,i) => (
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between',
+                    fontSize:12, color:'var(--muted)', padding:'2px 0' }}>
+                    <span>×{item.qty} {item.name}</span>
+                    <span style={{ fontFamily:'var(--mono)' }}>S/{(item.price*item.qty).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
             )
-            if (itemsCocina.length === 0 && !order.extras) return null
+            if (order.soloReferencia) return <div key={order.key}>{bloqueBebidas}</div>
+            const oc = ordersCocina.indexOf(order)
             return (
             <div key={order.key}>
-              {mesaOrders.length > 1 && (
+              {ordersCocina.length > 1 && (
                 <div style={{ display:'flex', alignItems:'center', gap:8,
-                  marginBottom:6, marginTop: oi>0?10:0 }}>
+                  marginBottom:6, marginTop: oc>0?10:0 }}>
                   <div style={{ height:1, flex:1, background:'var(--border)' }} />
                   <span style={{ fontSize:10, color:'var(--blue)', fontWeight:800,
                     letterSpacing:1, whiteSpace:'nowrap' }}>
-                    {oi===0?'1er PEDIDO':`+PEDIDO ${oi+1}`} · {fmt12(order.timeISO)}
+                    {oc===0?'1er PEDIDO':`+PEDIDO ${oc+1}`} · {fmt12(order.timeISO)}
                   </span>
                   <div style={{ height:1, flex:1, background:'var(--border)' }} />
                 </div>
@@ -256,7 +277,8 @@ export default function Cocina() {
                   </div>
                 </div>
               )}
-              {mesaOrders.length === 1 && order.timeISO && (
+              {bloqueBebidas}
+              {ordersCocina.length === 1 && order.timeISO && (
                 <div style={{ fontSize:10, color:'var(--muted)', marginTop:8 }}>
                   📌 Pedido: {fmt12(order.timeISO)}
                 </div>
@@ -266,7 +288,7 @@ export default function Cocina() {
                   style={{ width:'100%', borderRadius:10, fontSize:14,
                     letterSpacing:2, padding:'12px 0', marginTop:10 }}
                   onClick={() => marcarListo(order.key)}>
-                  ✅ LISTO — {mesaOrders.length>1?`PEDIDO ${oi+1}`:'ENTREGAR'}
+                  ✅ LISTO — {ordersCocina.length>1?`PEDIDO ${oc+1}`:'ENTREGAR'}
                 </button>
               ) : (
                 <button onClick={() => desbloquearMesa(order.key)}
