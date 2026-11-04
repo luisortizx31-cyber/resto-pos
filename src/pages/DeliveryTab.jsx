@@ -4,6 +4,7 @@ import { ref, onValue, update, remove } from 'firebase/database'
 import { doc, setDoc, collection } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
 import { obtenerInfoLogin } from '../lib/auth'
+import { esSoloBebidas, repreciarItems } from '../lib/utils'
 
 // ── Timer idéntico al del Repartidor ────────────────────────────────
 function Timer({ timeISO, urgentSecs = 1200, warnSecs = 600 }) {
@@ -143,9 +144,21 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
 
   // ── Acciones ─────────────────────────────────────────────────────
   const aceptar = async (key) => {
-    await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), { status: 'pending' })
-    showToast('✅ Pedido aceptado — en cocina')
-    setTab('en_proceso') // auto-cambiar a en proceso
+    try {
+      // Precios reales del menú (los del celular del cliente no son confiables)
+      const pedido = pedidos.find(p => p.key === key)
+      const { items, cambiados } = await repreciarItems(restoId, pedido?.items)
+      const total = items.reduce((a, i) => a + Number(i.price) * i.qty, 0)
+      await update(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), {
+        items, total, soloBebidas: esSoloBebidas(items), status: 'pending',
+      })
+      if (cambiados.length) showToast(`⚠️ Precio corregido según el menú: ${cambiados.join(', ')}`, 'error')
+      else showToast('✅ Pedido aceptado — en cocina')
+      setTab('en_proceso') // auto-cambiar a en proceso
+    } catch (e) {
+      console.error(e)
+      showToast('❌ No se pudo aceptar el pedido. Intenta de nuevo.', 'error')
+    }
   }
 
   const rechazar = async (key) => {

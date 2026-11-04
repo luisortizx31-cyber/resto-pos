@@ -50,6 +50,14 @@ export default function Layout() {
     return () => unsub()
   }, [])   // solo al montar
 
+  // Dueño con PINs de fábrica → obligado a cambiarlos en Config antes de seguir
+  useEffect(() => {
+    const s = getSession()
+    if (s?.role === 'dueno' && s.pinsPorDefecto?.length && !location.pathname.startsWith('/config')) {
+      navigate('/config', { replace: true })
+    }
+  }, [location.pathname, checked])
+
   const showToast = (msg, type = 'success') => {
     const id = Date.now()
     setToasts(t => [...t, { id, msg, type }])

@@ -6,7 +6,7 @@ import {
 } from 'firebase/firestore'
 import { ref as rtRef, onValue, push, set } from 'firebase/database'
 
-const BEBIDAS_CAT = ['bebidas', 'bebida', 'drinks', 'drink']
+import { esBebida, esSoloBebidas as todosSonBebidas, useCategoriasBebida } from '../lib/utils'
 
 function genPedidoId() {
   return 'pedido_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)
@@ -100,6 +100,7 @@ export default function ClienteMesa() {
   const mesaNum  = parseInt(num)
   const mesaKey  = `${restoId}_mesa_${mesaNum}`
   const mesaDocRef = doc(db, 'restaurantes', restoId, 'mesas', String(mesaNum))
+  useCategoriasBebida(restoId)
 
   // screen: 'loading' | 'carta' | 'seguimiento' | 'gracias'
   const [screen, setScreen]   = useState('loading')
@@ -387,9 +388,7 @@ export default function ClienteMesa() {
 
   const esSoloBebidas = () => {
     if (!menu || totalItems === 0) return false
-    return Object.values(carrito).every(v =>
-      BEBIDAS_CAT.includes((v.category || '').toLowerCase().trim())
-    )
+    return todosSonBebidas(Object.values(carrito))
   }
 
   // ── 5. Enviar pedido ─────────────────────────────────────────────
@@ -741,9 +740,8 @@ export default function ClienteMesa() {
                     else merged[key] = { ...item }
                   })
                   const items = Object.values(merged)
-                  const BEBIDAS = ['bebidas','bebida','drinks','drink']
-                  const bebidas  = items.filter(i => BEBIDAS.includes((i.category||'').toLowerCase().trim()))
-                  const comidas  = items.filter(i => !BEBIDAS.includes((i.category||'').toLowerCase().trim()))
+                  const bebidas  = items.filter(esBebida)
+                  const comidas  = items.filter(i => !esBebida(i))
 
                   const renderItem = (item, i, arr, esBebida) => (
                     <div key={i} style={{

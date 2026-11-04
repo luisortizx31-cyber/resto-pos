@@ -24,6 +24,47 @@ async function getAuthDoc(restoId) {
   return { ref, snap, exists: snap.exists, data: snap.exists ? snap.data() : null }
 }
 
+// Roles que siguen con el PIN de fábrica (1111/2222/3333)
+function pinsPorDefecto(authData) {
+  return ROLES.filter(r => !authData?.pins?.[r] || authData.pins[r] === DEFAULT_PINS[r])
+}
+
+// ── Límite de intentos de PIN (en servidor, por objetivo + IP) ──────────
+const MAX_FALLOS = 5
+const BLOQUEO_MS = 10 * 60 * 1000
+
+function intentoRef(request, objetivo) {
+  const fwd = String(request.rawRequest?.headers?.['x-forwarded-for'] || '').split(',')[0].trim()
+  const ip = String(fwd || request.rawRequest?.ip || 'sin-ip').replace(/[^\w.:-]/g, '_')
+  return db.doc(`loginIntentos/${objetivo}__${ip}`)
+}
+
+async function verificarBloqueo(ref) {
+  const snap = await ref.get()
+  const hasta = snap.exists ? (snap.data().bloqueadoHasta || 0) : 0
+  if (hasta > Date.now()) {
+    const min = Math.ceil((hasta - Date.now()) / 60000)
+    return `Demasiados intentos fallidos. Espera ${min} min.`
+  }
+  return null
+}
+
+async function registrarFallo(ref) {
+  await db.runTransaction(async t => {
+    const snap = await t.get(ref)
+    const d = snap.exists ? snap.data() : {}
+    const vencido = (d.bloqueadoHasta || 0) && d.bloqueadoHasta <= Date.now()
+    const fallos = (vencido ? 0 : (d.fallos || 0)) + 1
+    t.set(ref, {
+      fallos: fallos >= MAX_FALLOS ? 0 : fallos,
+      bloqueadoHasta: fallos >= MAX_FALLOS ? Date.now() + BLOQUEO_MS : 0,
+      ultimo: Date.now(),
+    })
+  })
+}
+
+const limpiarFallos = (ref) => ref.delete().catch(() => {})
+
 // ── Info pública para pantalla de login (sin PINs) ────────────────────
 exports.obtenerInfoLogin = onCall(async (request) => {
   const restoId = normId(request.data?.restoId)
@@ -61,12 +102,24 @@ exports.loginResto = onCall(async (request) => {
   const auth = await getAuthDoc(restoId)
   if (!auth.exists) return { ok: false, error: 'Restaurante no encontrado' }
 
+  const intentos = intentoRef(request, `${restoId}__${role}`)
+  const bloqueo = await verificarBloqueo(intentos)
+  if (bloqueo) return { ok: false, bloqueado: true, error: bloqueo }
+
   const expected = auth.data.pins?.[role] || DEFAULT_PINS[role]
-  if (pin !== expected) return { ok: false, error: 'PIN incorrecto' }
+  if (pin !== expected) {
+    await registrarFallo(intentos)
+    return { ok: false, error: 'PIN incorrecto' }
+  }
+  await limpiarFallos(intentos)
 
   const uid = `${restoId}__${role}`
   const token = await admin.auth().createCustomToken(uid, { restoId, role })
-  return { ok: true, token, restoNombre: auth.data.nombre || restoId }
+  return {
+    ok: true, token, restoNombre: auth.data.nombre || restoId,
+    // Solo el dueño puede cambiarlos, así que solo a él se le avisa
+    pinsPorDefecto: role === 'dueno' ? pinsPorDefecto(auth.data) : [],
+  }
 })
 
 // ── Login repartidor ────────────────────────────────────────────────────
@@ -86,7 +139,15 @@ exports.loginRepartidor = onCall(async (request) => {
 
   const rep = (auth.data.repartidores || []).find(r => r.id === repartidorId)
   if (!rep) return { ok: false, error: 'Repartidor no encontrado' }
-  if (pin !== rep.pin) return { ok: false, error: 'PIN incorrecto' }
+
+  const intentos = intentoRef(request, `${restoId}__rep__${repartidorId}`)
+  const bloqueo = await verificarBloqueo(intentos)
+  if (bloqueo) return { ok: false, bloqueado: true, error: bloqueo }
+  if (pin !== rep.pin) {
+    await registrarFallo(intentos)
+    return { ok: false, error: 'PIN incorrecto' }
+  }
+  await limpiarFallos(intentos)
 
   const uid = `${restoId}__repartidor__${repartidorId}`
   const token = await admin.auth().createCustomToken(uid, { restoId, role: 'repartidor', repartidorId })
@@ -105,7 +166,15 @@ exports.loginSuperAdmin = onCall(async (request) => {
   if (!snap.exists) return { ok: false, error: 'Configuración no encontrada' }
   const expected = snap.data().pin
   if (!expected) return { ok: false, error: 'PIN no configurado' }
-  if (pin !== expected) return { ok: false, error: 'PIN incorrecto' }
+
+  const intentos = intentoRef(request, 'superadmin')
+  const bloqueo = await verificarBloqueo(intentos)
+  if (bloqueo) return { ok: false, bloqueado: true, error: bloqueo }
+  if (pin !== String(expected)) {
+    await registrarFallo(intentos)
+    return { ok: false, error: 'PIN incorrecto' }
+  }
+  await limpiarFallos(intentos)
 
   const token = await admin.auth().createCustomToken('superadmin', { role: 'superadmin' })
   return { ok: true, token }
@@ -135,6 +204,10 @@ exports.gestionarAuthResto = onCall(async (request) => {
         return { ok: false, error: 'PIN actual incorrecto' }
       }
       const newPins = { ...(auth.data.pins || {}) }
+      const elegidos = ROLES.map(k => payload.pins[k]).filter(Boolean)
+      if (elegidos.some(p => Object.values(DEFAULT_PINS).includes(p))) {
+        return { ok: false, error: 'No uses 1111, 2222 ni 3333: son los PINs de fábrica' }
+      }
       ROLES.forEach(k => {
         if (payload.pins[k] && /^\d{4}$/.test(payload.pins[k])) newPins[k] = payload.pins[k]
       })
@@ -142,7 +215,7 @@ exports.gestionarAuthResto = onCall(async (request) => {
     }
     if (typeof payload.whatsapp === 'string') update.whatsapp = payload.whatsapp.trim()
     await auth.ref.update(update)
-    return { ok: true }
+    return { ok: true, pinsPorDefecto: pinsPorDefecto({ ...auth.data, ...update }) }
   }
 
   if (accion === 'listRepartidores') {

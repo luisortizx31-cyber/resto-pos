@@ -3,6 +3,7 @@ import { db, functions } from '../lib/firebase'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { useSession, useToast } from '../components/Layout'
+import { getSession, updateSession, ROLE_INFO } from '../lib/auth'
 
 const gestionarAuthResto = httpsCallable(functions, 'gestionarAuthResto')
 
@@ -21,6 +22,7 @@ export default function Config() {
   const [loading, setLoading] = useState(true)
   const [confirmEliminarId, setConfirmEliminarId] = useState(null)
   const [pinVisible, setPinVisible] = useState({})
+  const [pinsDefecto, setPinsDefecto] = useState(() => getSession()?.pinsPorDefecto || [])
 
   useEffect(() => { if (restoId) loadConfig() }, [restoId])
 
@@ -51,7 +53,10 @@ export default function Config() {
         restoId, accion: 'setPins', payload: { pins: newPins, currentPin },
       })
       if (!res.data.ok) { showToast(res.data.error || 'Error al guardar', 'error'); setSaving(false); return }
-      showToast('✅ PINs actualizados')
+      const quedan = res.data.pinsPorDefecto || []
+      updateSession({ pinsPorDefecto: quedan })
+      setPinsDefecto(quedan)
+      showToast(quedan.length ? '✅ Guardado — aún faltan PINs por cambiar' : '✅ PINs actualizados')
       setCurrentPin('')
       setPins({ mesero:'', cocina:'', dueno:'' })
     } catch { showToast('Error al guardar', 'error') }
@@ -120,6 +125,16 @@ export default function Config() {
       {/* PINs — sin PIN global de repartidor */}
       {tab === 'pines' && (
         <div style={{ padding:20 }}>
+          {pinsDefecto.length > 0 && (
+            <div style={{ background:'rgba(255,77,77,.1)', border:'1.5px solid var(--red)',
+              borderRadius:12, padding:'12px 14px', marginBottom:16, fontSize:13, lineHeight:1.6 }}>
+              <div style={{ fontWeight:800, color:'var(--red)', marginBottom:4 }}>
+                🔒 Cambia los PINs de fábrica para continuar
+              </div>
+              Estos roles aún usan el PIN de fábrica (1111 / 2222 / 3333), que cualquiera puede adivinar:{' '}
+              <strong>{pinsDefecto.map(r => ROLE_INFO[r]?.label || r).join(', ')}</strong>.
+            </div>
+          )}
           <div style={{ fontSize:12, color:'var(--muted)', marginBottom:16, lineHeight:1.6 }}>
             Cada repartidor tiene su propio PIN personal configurado en la pestaña Repartidores.
           </div>

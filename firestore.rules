@@ -2,6 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function esSuperAdmin() {
+      return request.auth != null && request.auth.token.role == 'superadmin';
+    }
+    // Cualquier usuario del restaurante (mesero, cocina, dueño, repartidor)
+    function esStaff(restoId) {
+      return esSuperAdmin() || (request.auth != null && request.auth.token.restoId == restoId);
+    }
+    function esDueno(restoId) {
+      return esSuperAdmin() ||
+        (request.auth != null && request.auth.token.restoId == restoId && request.auth.token.role == 'dueno');
+    }
+    function cambia() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
     // Super admin PIN — solo Cloud Functions (Admin SDK) puede leerlo/escribirlo
     match /config/superadmin {
       allow read, write: if false;
@@ -12,15 +27,15 @@ service cloud.firestore {
       allow read: if true;
 
       // Crear / borrar un restaurante: solo super admin
-      allow create, delete: if request.auth != null && request.auth.token.role == 'superadmin';
+      allow create, delete: if esSuperAdmin();
 
-      // Actualizar: staff del mismo resto, pero el campo active/activo
-      // (suspender) queda reservado para super admin
-      allow update: if request.auth != null && (
-        request.auth.token.role == 'superadmin' ||
-        (request.auth.token.restoId == restoId &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['active', 'activo']))
-      );
+      // Actualizar:
+      //  - super admin: todo
+      //  - dueño: todo menos active/activo (suspender)
+      //  - mesero/cocina: solo abrir/cerrar QR y activar delivery
+      allow update: if esSuperAdmin() ||
+        (esDueno(restoId) && !cambia().hasAny(['active', 'activo'])) ||
+        (esStaff(restoId) && cambia().hasOnly(['qrMesasOff', 'qrActivo', 'tieneDelivery']));
 
       // PINs y repartidores — solo Cloud Functions
       match /config/auth {
@@ -33,34 +48,42 @@ service cloud.firestore {
       // las reglas que apliquen dice "true" (se combinan con OR, no gana la más
       // específica). Sin este `cfgId != 'auth'` este bloque volvía a abrir la
       // lectura de los PINs que el match de arriba bloquea.
+      // Escritura: solo el dueño, salvo el número de mesas (lo edita el mesero en Mesas).
       match /config/{cfgId} {
         allow read: if cfgId != 'auth';
-        allow write: if cfgId != 'auth' && request.auth != null &&
-          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+        allow write: if cfgId != 'auth' &&
+          (esDueno(restoId) || (cfgId == 'mesas' && esStaff(restoId)));
       }
 
-      // Menú — lectura pública, escritura solo staff del mismo resto
+      // Menú y precios — lectura pública, escritura solo el dueño
       match /menu/{itemId} {
         allow read: if true;
-        allow write: if request.auth != null &&
-          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+        allow write: if esDueno(restoId);
       }
 
-      // Mesas y pedidos — el cliente anónimo los toca por QR sin login.
-      // No se pueden restringir a auth sin romper el pedido por QR.
+      // Mesas y pedidos — el cliente anónimo los usa por QR sin login, pero solo
+      // puede ocupar la mesa y agregar platos. Liberar la mesa, cobrar o
+      // finalizar un pedido queda para el personal.
       match /mesas/{num} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if esStaff(restoId);
+        allow create: if request.resource.data.keys().hasOnly(['estado', 'pedidoActivoId', 'desde']) &&
+          request.resource.data.estado == 'ocupada';
+        allow update: if cambia().hasOnly(['estado', 'pedidoActivoId', 'desde']) &&
+          request.resource.data.estado == 'ocupada';
       }
       match /pedidos/{pedidoId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if esStaff(restoId);
+        allow create: if request.resource.data.keys().hasOnly(['restoId', 'mesa', 'estado', 'items', 'creadoEn']) &&
+          request.resource.data.estado == 'activo';
+        allow update: if resource.data.estado == 'activo' && cambia().hasOnly(['items']);
       }
 
-      // Historial de ventas — antes era 100% público
+      // Historial de ventas — solo el personal del restaurante
       match /historial/{histId} {
-        allow read: if request.auth != null &&
-          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
-        allow create, delete: if request.auth != null &&
-          (request.auth.token.restoId == restoId || request.auth.token.role == 'superadmin');
+        allow read: if esStaff(restoId);
+        allow create, delete: if esStaff(restoId);
       }
     }
   }

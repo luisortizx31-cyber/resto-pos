@@ -4,7 +4,7 @@ import { useSession } from '../components/Layout'
 import DeliveryTab from './DeliveryTab'
 import { ref, onValue, update } from 'firebase/database'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
-import { fmt12, BEBIDAS_CAT } from '../lib/utils'
+import { fmt12, esBebida, useCategoriasBebida } from '../lib/utils'
 
 function useClock() {
   const [now, setNow] = useState(new Date())
@@ -81,6 +81,7 @@ function playBeepMesa() {
 export default function Cocina() {
   const session = useSession()
   const restoId = session?.restoId
+  useCategoriasBebida(restoId)
   const [orders, setOrders]           = useState({})
   const [tab, setTab]                 = useState('pendientes')
   const [tieneDelivery, setTieneDelivery] = useState(true)
@@ -126,8 +127,6 @@ export default function Cocina() {
     } catch {}
     setTogglingDelivery(false)
   }
-
-  const esBebida = (i) => BEBIDAS_CAT.includes((i.category || '').toLowerCase().trim())
 
   // Separar pedidos — las bebidas se conservan como referencia (no se preparan aquí)
   const pendingOrders = {}, listoOrders = {}, soloBebidasOrders = []

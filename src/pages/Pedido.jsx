@@ -4,7 +4,7 @@ import { db, rtdb } from '../lib/firebase'
 import { collection, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore'
 import { ref, push } from 'firebase/database'
 import { useToast, useSession } from '../components/Layout'
-import { esSoloBebidas } from '../lib/utils'
+import { esSoloBebidas, useCategoriasBebida } from '../lib/utils'
 
 const DEFAULT_MENU = {}
 
@@ -14,6 +14,7 @@ const DEFAULT_MENU = {}
 export default function Pedido() {
   const session  = useSession()
   const restoId  = session?.restoId
+  useCategoriasBebida(restoId)
   const { mesa } = useParams()
   const navigate = useNavigate()
   const showToast = useToast()

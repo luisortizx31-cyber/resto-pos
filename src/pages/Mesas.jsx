@@ -2,13 +2,14 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { rtdb, db } from '../lib/firebase'
 import { ref, onValue, remove, update, set } from 'firebase/database'
-import { collection, addDoc, doc, getDoc, setDoc, updateDoc, query, where, getDocs } from 'firebase/firestore'
+import { collection, addDoc, doc, getDoc, setDoc, updateDoc, query, where, getDocs, arrayUnion } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
-import { fmt12, mergeItems } from '../lib/utils'
+import { fmt12, mergeItems, esBebida, esSoloBebidas, repreciarItems, useCategoriasBebida } from '../lib/utils'
 
 export default function Mesas() {
   const session = useSession()
   const restoId = session?.restoId
+  useCategoriasBebida(restoId)
   const [activeOrders, setActiveOrders]   = useState({})
   const [mesasActivas, setMesasActivas]   = useState(new Set())
   const [confirming, setConfirming]       = useState(null)
@@ -279,11 +280,21 @@ export default function Mesas() {
 
   const confirmarPedidoCliente = async (key, mesa) => {
     const order = activeOrders[key]
-    const nuevoStatus = order?.soloBebidas ? 'listo' : 'pending'
-    await update(ref(rtdb, `${restoId}/pedidos_activos/${key}`), { status: nuevoStatus })
-    await set(ref(rtdb, `${restoId}/mesas_activas/${mesa}`), true)
-    setConfirmandoCliente(null)
-    showToast(order?.soloBebidas ? '🥤 Bebidas confirmadas — listas para cobrar' : '✅ Pedido confirmado — enviado a cocina')
+    try {
+      // Precios y categorías reales del menú (los del celular del cliente no son confiables)
+      const { items, cambiados } = await repreciarItems(restoId, order?.items)
+      const soloBebidas = esSoloBebidas(items)
+      await update(ref(rtdb, `${restoId}/pedidos_activos/${key}`), {
+        items, soloBebidas, status: soloBebidas ? 'listo' : 'pending',
+      })
+      await set(ref(rtdb, `${restoId}/mesas_activas/${mesa}`), true)
+      setConfirmandoCliente(null)
+      if (cambiados.length) showToast(`⚠️ Precio corregido según el menú: ${cambiados.join(', ')}`, 'error')
+      else showToast(soloBebidas ? '🥤 Bebidas confirmadas — listas para cobrar' : '✅ Pedido confirmado — enviado a cocina')
+    } catch (e) {
+      console.error(e)
+      showToast('❌ No se pudo confirmar el pedido. Intenta de nuevo.', 'error')
+    }
   }
 
   const rechazarPedidoCliente = async (key) => {
@@ -302,8 +313,11 @@ export default function Mesas() {
     // Efectivo real recibido (sin vuelto)
     const efectivoNecesario      = Math.max(0, total - pagoYape)
     const efectivoRealRecibido   = pagoEfectivo > efectivoNecesario ? efectivoNecesario : pagoEfectivo
+    // Pasos secundarios que fallaron (la venta igual quedó registrada)
+    const fallos = []
     try {
-      // 1. Guardar UN SOLO registro en historial con el total correcto y todos los items fusionados
+      // 1. Guardar UN SOLO registro en historial con el total correcto y todos los items fusionados.
+      //    Si esto falla se detiene el cobro: sin historial la venta se perdería.
       try {
         await addDoc(collection(db, 'restaurantes', restoId, 'historial'), {
           mesa:          confirming.num,
@@ -317,12 +331,19 @@ export default function Mesas() {
           pagoYape,
           pagoEfectivo:  efectivoRealRecibido,
         })
-      } catch {}
+      } catch (e) {
+        console.error('historial', e)
+        showToast('❌ No se pudo registrar la venta. La mesa sigue abierta: intenta cobrar de nuevo.', 'error')
+        setProcessing(false)
+        return
+      }
 
       // 2. Limpiar todos los pedidos RTDB de la mesa
-      for (const [key] of confirming.orders) {
-        await remove(ref(rtdb, `${restoId}/pedidos_activos/${key}`))
-      }
+      try {
+        for (const [key] of confirming.orders) {
+          await remove(ref(rtdb, `${restoId}/pedidos_activos/${key}`))
+        }
+      } catch (e) { console.error(e); fallos.push('limpiar pedidos') }
 
       // 2. Finalizar pedido en Firestore y limpiar mesa
       try {
@@ -342,7 +363,7 @@ export default function Mesas() {
               totalFinal: total,
               descuento: descuentoAmt,
             })
-          } catch {}
+          } catch (e) { console.error(e); fallos.push('cerrar pedido del cliente') }
         }
 
         // Fallback: también intentar via pedidoActivoId del doc de mesa
@@ -363,20 +384,21 @@ export default function Mesas() {
 
         const cobradoEn = new Date().toISOString()
         await setDoc(mesaDocRef, { estado: 'libre', pedidoActivoId: null, cobradoEn }, { merge: true })
-      } catch {}
+      } catch (e) { console.error(e); fallos.push('liberar mesa') }
 
       // 3. Limpiar RTDB mesas_activas
-      await remove(ref(rtdb, `${restoId}/mesas_activas/${confirming.num}`))
-
-      // 4. Cerrar QR de esta mesa automáticamente
       try {
-        const restoRef  = doc(db, 'restaurantes', restoId)
-        const restoSnap = await getDoc(restoRef)
-        const mesasOff  = restoSnap.exists() ? (restoSnap.data().qrMesasOff || []) : []
-        if (!mesasOff.includes(confirming.num)) {
-          await updateDoc(restoRef, { qrMesasOff: [...mesasOff, confirming.num] })
-        }
-      } catch {}
+        await remove(ref(rtdb, `${restoId}/mesas_activas/${confirming.num}`))
+      } catch (e) { console.error(e); fallos.push('liberar mesa') }
+
+      // 4. Cerrar QR de esta mesa automáticamente (arrayUnion: sin pisar otros cobros simultáneos)
+      try {
+        await updateDoc(doc(db, 'restaurantes', restoId), { qrMesasOff: arrayUnion(confirming.num) })
+      } catch (e) { console.error(e); fallos.push('cerrar QR') }
+
+      if (fallos.length) {
+        showToast(`⚠️ Venta registrada, pero falló: ${[...new Set(fallos)].join(', ')}. Revisa la mesa ${confirming.num}.`, 'error')
+      }
 
       setComprobante({ num:confirming.num, orders:confirming.orders,
         mergedItems:merged, bruto, descuentoAmt, total,
@@ -606,9 +628,8 @@ export default function Mesas() {
               <div style={{ overflowY:'auto', flex:1, padding:'16px 22px 8px' }}>
                 <div style={{ background:'var(--surface)', borderRadius:12, padding:12 }}>
                   {(() => {
-                    const BEBIDAS = ['bebidas','bebida','drinks','drink']
-                    const bebidas = pedidoItems.filter(i => BEBIDAS.includes((i.category||'').toLowerCase().trim()))
-                    const comidas = pedidoItems.filter(i => !BEBIDAS.includes((i.category||'').toLowerCase().trim()))
+                    const bebidas = pedidoItems.filter(esBebida)
+                    const comidas = pedidoItems.filter(i => !esBebida(i))
 
                     const renderItem = (item, i, esBebida) => (
                       <div key={i} style={{
@@ -760,7 +781,7 @@ export default function Mesas() {
                   letterSpacing:2, marginBottom:12, textTransform:'uppercase',
                   borderBottom:'1px solid var(--border)', paddingBottom:8 }}>📋 RESUMEN</div>
                 {merged.map((item, i) => {
-                  const esBebida = ['bebidas','bebida','drinks','drink'].includes((item.category||'').toLowerCase().trim())
+                  const itemEsBebida = esBebida(item)
                   const itemKey  = `${item.name}__${item.price}`
                   const entregado = itemsEntregados[itemKey] || false
                   return (
@@ -768,21 +789,21 @@ export default function Mesas() {
                       style={{
                         display:'flex', justifyContent:'space-between', alignItems:'center',
                         padding:'8px 10px', marginBottom:6, borderRadius:10, cursor:'pointer',
-                        background: entregado ? 'rgba(255,255,255,.02)' : esBebida ? 'rgba(74,158,255,.08)' : 'rgba(245,166,35,.05)',
-                        border: `1.5px solid ${entregado ? 'var(--border)' : esBebida ? 'rgba(74,158,255,.25)' : 'rgba(245,166,35,.2)'}`,
+                        background: entregado ? 'rgba(255,255,255,.02)' : itemEsBebida ? 'rgba(74,158,255,.08)' : 'rgba(245,166,35,.05)',
+                        border: `1.5px solid ${entregado ? 'var(--border)' : itemEsBebida ? 'rgba(74,158,255,.25)' : 'rgba(245,166,35,.2)'}`,
                         transition:'all .15s', opacity: entregado ? 0.5 : 1 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
                         {/* Checkbox */}
                         <div style={{
                           width:20, height:20, borderRadius:6, flexShrink:0,
-                          border: `2px solid ${entregado ? 'var(--green)' : esBebida ? '#4a9eff' : 'var(--accent)'}`,
+                          border: `2px solid ${entregado ? 'var(--green)' : itemEsBebida ? '#4a9eff' : 'var(--accent)'}`,
                           background: entregado ? 'var(--green)' : 'transparent',
                           display:'flex', alignItems:'center', justifyContent:'center' }}>
                           {entregado && <span style={{ color:'#111', fontSize:12, fontWeight:900 }}>✓</span>}
                         </div>
                         {/* Badge cantidad */}
                         <div style={{
-                          background: esBebida ? '#4a9eff' : 'var(--accent)',
+                          background: itemEsBebida ? '#4a9eff' : 'var(--accent)',
                           color:'#111', fontWeight:900, fontSize:11,
                           width:22, height:22, borderRadius:'50%', flexShrink:0,
                           display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -792,9 +813,9 @@ export default function Mesas() {
                           <div style={{
                             fontWeight:700, fontSize:13,
                             textDecoration: entregado ? 'line-through' : 'none',
-                            color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--text)',
+                            color: entregado ? 'var(--muted)' : itemEsBebida ? '#4a9eff' : 'var(--text)',
                             wordBreak:'break-word' }}>
-                            {esBebida ? '🥤 ' : ''}{item.name}
+                            {itemEsBebida ? '🥤 ' : ''}{item.name}
                           </div>
                           <div style={{ fontSize:13, color:'var(--text)', fontWeight:600, marginTop:2 }}>
                             S/{Number(item.price).toFixed(2)} c/u
@@ -804,7 +825,7 @@ export default function Mesas() {
                       <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, marginLeft:8 }}>
                         <span style={{
                           fontFamily:'var(--mono)', fontWeight:800, fontSize:14,
-                          color: entregado ? 'var(--muted)' : esBebida ? '#4a9eff' : 'var(--accent)',
+                          color: entregado ? 'var(--muted)' : itemEsBebida ? '#4a9eff' : 'var(--accent)',
                           textDecoration: entregado ? 'line-through' : 'none' }}>
                           S/{(item.price*item.qty).toFixed(2)}
                         </span>

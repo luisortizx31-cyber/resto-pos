@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { db, rtdb } from '../lib/firebase'
 import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore'
 import { ref, push, onValue } from 'firebase/database'
-import { esSoloBebidas } from '../lib/utils'
+import { esSoloBebidas, useCategoriasBebida } from '../lib/utils'
 
 const STATUS_INFO = {
   esperando_confirmacion: { icon:'⏳', label:'Esperando confirmación', color:'#f5a623', bg:'rgba(245,166,35,.12)' },
@@ -22,6 +22,19 @@ function getClienteId() {
   return id
 }
 
+// Claves de los pedidos de este cliente. La lista completa de pedidos ya no es
+// pública (tiene nombre, teléfono y dirección de otros clientes): cada cliente
+// solo escucha sus propios pedidos por su clave.
+function getMisKeys(restoId) {
+  try { return JSON.parse(sessionStorage.getItem('delivery_keys_' + restoId)) || [] }
+  catch { return [] }
+}
+function addMiKey(restoId, key) {
+  const keys = [...new Set([...getMisKeys(restoId), key])]
+  sessionStorage.setItem('delivery_keys_' + restoId, JSON.stringify(keys))
+  return keys
+}
+
 function mergeItemsFlat(pedidos) {
   const map = {}
   pedidos.forEach(p => {
@@ -37,6 +50,7 @@ function mergeItemsFlat(pedidos) {
 export default function Delivery() {
   const { restoId } = useParams()
   const clienteId   = getClienteId()
+  useCategoriasBebida(restoId)
 
   const [screen, setScreen]       = useState('carta') // 'carta' | 'form' | 'seguimiento'
   const [menu, setMenu]           = useState(null)
@@ -95,18 +109,23 @@ export default function Delivery() {
     getDoc(doc(db, 'restaurantes', restoId, 'config', 'destacados')).then(snap => {
       if (snap.exists()) setDestacados(snap.data().lista || [])
     }).catch(() => {})
-    const unsub = onValue(ref(rtdb, `${restoId}/delivery_pedidos`), snap => {
-      const data = snap.val() || {}
-      const mios = Object.entries(data)
-        .filter(([, o]) => o.clienteId === clienteId)
-        .map(([key, o]) => ({ key, ...o }))
-        .sort((a, b) => new Date(a.timeISO) - new Date(b.timeISO))
+  }, [restoId])
+
+  // Escuchar solo los pedidos propios, uno por uno
+  const [misKeys, setMisKeys] = useState(() => getMisKeys(restoId))
+  useEffect(() => {
+    if (!restoId || misKeys.length === 0) return
+    const datos = {}
+    const unsubs = misKeys.map(key => onValue(ref(rtdb, `${restoId}/delivery_pedidos/${key}`), snap => {
+      if (snap.exists()) datos[key] = { key, ...snap.val() }
+      else delete datos[key]
+      const mios = Object.values(datos).sort((a, b) => new Date(a.timeISO) - new Date(b.timeISO))
       setMisPedidos(mios)
       if (mios.length > 0)
         setScreen(prev => prev === 'carta' || prev === 'form' ? 'seguimiento' : prev)
-    })
-    return () => unsub()
-  }, [restoId])
+    }))
+    return () => unsubs.forEach(u => u())
+  }, [restoId, misKeys])
 
   const carritoKey = (itemId, varIdx) => `${itemId}__${varIdx}`
 
@@ -141,7 +160,7 @@ export default function Delivery() {
         category: v.category || '',
       }))
       const soloBebidas = esSoloBebidas(itemsArr)
-      await push(ref(rtdb, `${restoId}/delivery_pedidos`), {
+      const nuevoRef = await push(ref(rtdb, `${restoId}/delivery_pedidos`), {
         items: itemsArr,
         notas: notas.trim(),
         cliente: formData,
@@ -152,6 +171,7 @@ export default function Delivery() {
         timeISO: new Date().toISOString(),
         total: totalPrice,
       })
+      setMisKeys(addMiKey(restoId, nuevoRef.key))
       // Abrir WhatsApp del dueño con resumen del pedido
       if (restoInfo?.whatsapp) {
         const lineas = itemsArr.map(i => `• ${i.qty}x ${i.name} - S/${(i.price * i.qty).toFixed(2)}`).join('\n')

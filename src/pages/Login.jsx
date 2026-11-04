@@ -77,6 +77,10 @@ export default function Login() {
         } else if (res.suspendido) {
           setError('🚫 Este restaurante está suspendido. Contacta al administrador.')
           setPin(''); setStep('id'); setLoading(false); return
+        } else if (res.error !== 'PIN incorrecto') {
+          // Bloqueo del servidor, sin internet, servidor caído, etc.
+          setError(`⚠️ ${res.error}`)
+          setPin(''); setLoading(false); return
         } else {
           const nuevosIntentos = intentos + 1
           setIntentos(nuevosIntentos)

@@ -1,4 +1,7 @@
 // ── Utilidades compartidas ────────────────────────────────────────
+import { useEffect, useState } from 'react'
+import { collection, doc, getDocs, onSnapshot } from 'firebase/firestore'
+import { db } from './firebase'
 
 /** Formatea ISO → "h:mm AM/PM" */
 export function fmt12(iso) {
@@ -50,9 +53,55 @@ export function mergeItemsFlat(pedidos) {
 /** Categorías de bebidas (para excluir de cocina) */
 export const BEBIDAS_CAT = ['bebidas', 'bebida', 'drinks', 'drink']
 
+// Categorías que el dueño marcó como bebida en Menú → Categorías (config/categorias.bebidas)
+let bebidasMarcadas = new Set()
+const normCat = (c) => (c || '').toLowerCase().trim()
+
+/** ¿Este item es bebida? (no se prepara en cocina) */
+export function esBebida(item) {
+  const c = normCat(item?.category)
+  return BEBIDAS_CAT.includes(c) || bebidasMarcadas.has(c)
+}
+
 /** ¿Todos los items son bebidas? */
 export function esSoloBebidas(items) {
-  return items.length > 0 && items.every(i =>
-    BEBIDAS_CAT.includes((i.category || '').toLowerCase().trim())
-  )
+  return items.length > 0 && items.every(esBebida)
+}
+
+/** Carga (en vivo) las categorías marcadas como bebida. Llamar una vez por página. */
+export function useCategoriasBebida(restoId) {
+  const [, setVersion] = useState(0)
+  useEffect(() => {
+    if (!restoId) return
+    return onSnapshot(doc(db, 'restaurantes', restoId, 'config', 'categorias'), snap => {
+      bebidasMarcadas = new Set((snap.exists() ? snap.data().bebidas || [] : []).map(normCat))
+      setVersion(v => v + 1)
+    }, () => {})
+  }, [restoId])
+}
+
+/**
+ * Vuelve a poner el precio y la categoría reales del menú en items que mandó un
+ * cliente (QR / delivery). El precio viene del celular del cliente y podría
+ * estar alterado. Devuelve { items, cambiados } con los nombres corregidos.
+ */
+export async function repreciarItems(restoId, items) {
+  const snap = await getDocs(collection(db, 'restaurantes', restoId, 'menu'))
+  const menu = {}
+  snap.forEach(d => { menu[d.id] = d.data() })
+  const cambiados = []
+  const nuevos = (items || []).map(item => {
+    const m = menu[item.id]
+    if (!m) return item
+    let precio = Number(m.price)
+    if (m.variantes?.length) {
+      const v = m.variantes.find(v => `${m.name} (${v.nombre})` === item.name)
+      if (!v) return item
+      precio = Number(v.precio)
+    }
+    if (!Number.isFinite(precio)) return item
+    if (precio !== Number(item.price)) cambiados.push(item.name)
+    return { ...item, price: precio, category: m.category || item.category || '' }
+  })
+  return { items: nuevos, cambiados }
 }

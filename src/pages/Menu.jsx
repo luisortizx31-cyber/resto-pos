@@ -3,6 +3,7 @@ import { db } from '../lib/firebase'
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
 import { subirFotoMenu } from '../lib/imagen'
+import { BEBIDAS_CAT } from '../lib/utils'
 
 const DEFAULT_CATEGORIES = ['Ceviches', 'Combinados', 'Bebidas', 'Guarniciones', 'Entradas', 'Postres', 'Otros']
 const EMPTY_FORM = { name:'', category:'', fotoUrl:'', tieneVariantes: false, price:'', variantes:[{nombre:'',precio:''}] }
@@ -55,7 +56,18 @@ export default function Menu() {
     return DEFAULT_CATEGORIES
   }
   const saveCategories = async (lista) => {
-    await setDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias'), { lista })
+    await setDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias'), { lista }, { merge: true })
+  }
+  // Categorías marcadas como bebida: no van a cocina (solo referencia)
+  const [bebidasCats, setBebidasCats] = useState([])
+  const esCatBebida = (cat) => BEBIDAS_CAT.includes(cat.toLowerCase().trim()) || bebidasCats.includes(cat)
+  const toggleBebida = async (cat) => {
+    const nueva = bebidasCats.includes(cat) ? bebidasCats.filter(c => c !== cat) : [...bebidasCats, cat]
+    setBebidasCats(nueva)
+    try {
+      await setDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias'), { bebidas: nueva }, { merge: true })
+      showToast(nueva.includes(cat) ? `🥤 "${cat}" ahora es bebida (no va a cocina)` : `🍳 "${cat}" ahora va a cocina`)
+    } catch { showToast('Error al guardar', 'error') }
   }
   const moverCategoria = async (idx, dir) => {
     const nueva = [...categories]
@@ -152,6 +164,9 @@ export default function Menu() {
       setCategories(cats)
       setForm(f => ({ ...f, category: cats[0] || '' }))
     })
+    getDoc(doc(db, 'restaurantes', restoId, 'config', 'categorias'))
+      .then(snap => setBebidasCats(snap.exists() ? snap.data().bebidas || [] : []))
+      .catch(() => {})
     load()
     loadDestacados().then(setDestacados)
     // Platos deshabilitados
@@ -568,6 +583,9 @@ export default function Menu() {
             </div>
           </div>
           <div className="section-label" style={{ marginBottom:10 }}>Categorías ({categories.length})</div>
+          <div style={{ fontSize:11, color:'var(--muted)', marginBottom:10, lineHeight:1.5 }}>
+            Toca 🥤 para marcar una categoría como bebida (ej: Jugos, Gaseosas). Las bebidas no se preparan en cocina: ahí solo salen como referencia.
+          </div>
           {categories.map((cat, idx) => {
             const count = items.filter(i => i.category === cat).length
             return (
@@ -580,6 +598,12 @@ export default function Menu() {
                   <span style={{ color:'var(--muted)', fontSize:12, marginLeft:8 }}>{count} plato{count!==1?'s':''}</span>
                 </div>
                 <div style={{ display:'flex', gap:5 }}>
+                  <button className="btn btn-ghost" title="¿Es bebida? Las bebidas no se preparan en cocina"
+                    style={{ padding:'6px 9px', fontSize:12,
+                      opacity: esCatBebida(cat) ? 1 : .35,
+                      borderColor: esCatBebida(cat) ? 'var(--blue)' : undefined }}
+                    disabled={BEBIDAS_CAT.includes(cat.toLowerCase().trim())}
+                    onClick={() => toggleBebida(cat)}>🥤</button>
                   <button className="btn btn-ghost" style={{ padding:'6px 9px', fontSize:12 }}
                     onClick={() => moverCategoria(idx, -1)} disabled={idx===0}>↑</button>
                   <button className="btn btn-ghost" style={{ padding:'6px 9px', fontSize:12 }}

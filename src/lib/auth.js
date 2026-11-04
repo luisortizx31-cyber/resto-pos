@@ -31,6 +31,18 @@ export function clearSession() {
   localStorage.removeItem('resto_superadmin')
   signOut(auth).catch(() => {})
 }
+export function updateSession(extra) {
+  const s = getSession()
+  if (s) localStorage.setItem('resto_session', JSON.stringify({ ...s, ...extra }))
+}
+
+// Mensaje legible de un error de Cloud Functions (antes todo era "Error de conexión")
+export function errorMsg(e) {
+  if (!navigator.onLine) return 'Sin internet. Revisa tu conexión.'
+  const code = String(e?.code || '').replace('functions/', '')
+  if (code === 'internal' || code === 'unavailable') return 'El servidor no responde. Intenta en unos minutos.'
+  return e?.message || 'Error de conexión'
+}
 export function isSuperAdmin() { return localStorage.getItem('resto_superadmin') === 'true' }
 export function canAccess(role, page) { return PERMS[role]?.includes(page) ?? false }
 
@@ -39,7 +51,7 @@ export async function obtenerInfoLogin(restoId) {
     const fn = httpsCallable(functions, 'obtenerInfoLogin')
     const res = await fn({ restoId })
     return res.data
-  } catch { return { ok: false, error: 'Error de conexión' } }
+  } catch (e) { return { ok: false, error: errorMsg(e) } }
 }
 
 export async function loginSuperAdmin(pin) {
@@ -50,7 +62,7 @@ export async function loginSuperAdmin(pin) {
     await signInWithCustomToken(auth, res.data.token)
     localStorage.setItem('resto_superadmin', 'true')
     return { ok: true }
-  } catch { return { ok: false, error: 'Error de conexión' } }
+  } catch (e) { return { ok: false, error: errorMsg(e) } }
 }
 
 export async function loginResto(restoId, role, pin) {
@@ -58,12 +70,15 @@ export async function loginResto(restoId, role, pin) {
     const fn = httpsCallable(functions, 'loginResto')
     const res = await fn({ restoId, role, pin })
     if (!res.data.ok) {
-      return { ok: false, error: res.data.error, suspendido: res.data.suspendido }
+      return { ok: false, error: res.data.error, suspendido: res.data.suspendido, bloqueado: res.data.bloqueado }
     }
     await signInWithCustomToken(auth, res.data.token)
-    saveSession(restoId, role, { restoNombre: res.data.restoNombre })
+    saveSession(restoId, role, {
+      restoNombre: res.data.restoNombre,
+      pinsPorDefecto: res.data.pinsPorDefecto || [],
+    })
     return { ok: true }
-  } catch { return { ok: false, error: 'Error de conexión' } }
+  } catch (e) { return { ok: false, error: errorMsg(e) } }
 }
 
 export async function loginRepartidor(restoId, repartidorId, pin) {
@@ -71,7 +86,7 @@ export async function loginRepartidor(restoId, repartidorId, pin) {
     const fn = httpsCallable(functions, 'loginRepartidor')
     const res = await fn({ restoId, repartidorId, pin })
     if (!res.data.ok) {
-      return { ok: false, error: res.data.error, suspendido: res.data.suspendido }
+      return { ok: false, error: res.data.error, suspendido: res.data.suspendido, bloqueado: res.data.bloqueado }
     }
     await signInWithCustomToken(auth, res.data.token)
     saveSession(restoId, 'repartidor', {
@@ -81,5 +96,5 @@ export async function loginRepartidor(restoId, repartidorId, pin) {
       repartidorCelular: res.data.repartidorCelular,
     })
     return { ok: true }
-  } catch { return { ok: false, error: 'Error de conexión' } }
+  } catch (e) { return { ok: false, error: errorMsg(e) } }
 }
