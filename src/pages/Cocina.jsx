@@ -270,7 +270,7 @@ export default function Cocina() {
                   <div style={{ fontSize:9, color:'var(--yellow)', letterSpacing:2,
                     textTransform:'uppercase', fontWeight:800, marginBottom:3 }}>⭐ Adicional</div>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div style={{ fontSize:13, color:'#ffe082', lineHeight:1.4, flex:1 }}>{order.extras}</div>
+                    <div style={{ fontSize:13, color:'var(--extra-text)', lineHeight:1.4, flex:1 }}>{order.extras}</div>
                     {order.extrasPrice > 0 && (
                       <div style={{ fontFamily:'var(--mono)', fontSize:13, color:'var(--yellow)',
                         fontWeight:700, marginLeft:8 }}>S/{Number(order.extrasPrice).toFixed(2)}</div>

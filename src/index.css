@@ -17,7 +17,30 @@
   --muted2:   #8a847d;
   --font:     'Syne', sans-serif;
   --mono:     'DM Mono', monospace;
+  --extra-text: #ffe082;
+  color-scheme: dark;
 }
+
+/* Modo día (claro) — se activa desde Config / botón Tema (ver lib/tema.js) */
+:root[data-theme="light"] {
+  --bg:       #f6f3ee;
+  --surface:  #ffffff;
+  --card:     #ffffff;
+  --card2:    #f1ede6;
+  --border:   #e2dcd3;
+  --accent:   #e08e0b;
+  --accent2:  #d4470f;
+  --green:    #16a062;
+  --yellow:   #a87c00;
+  --red:      #d92d27;
+  --blue:     #1f74d6;
+  --text:     #1d1a17;
+  --muted:    #7a736c;
+  --muted2:   #5f5953;
+  --extra-text: #7a5a00;
+  color-scheme: light;
+}
+:root[data-theme="light"] .toast { box-shadow: 0 8px 32px rgba(0,0,0,.15); }
 
 html, body, #root {
   height: 100%;

@@ -907,7 +907,7 @@ export default function Mesas() {
                           setPago({ yape: e.target.value, efectivo: resto > 0 ? resto.toFixed(2) : '' })
                         }}
                         style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border)',
-                          borderRadius:8, padding:'6px 8px', color:'white',
+                          borderRadius:8, padding:'6px 8px', color:'var(--text)',
                           fontFamily:'var(--mono)', fontSize:15, fontWeight:700,
                           outline:'none' }} />
                     </div>
@@ -926,7 +926,7 @@ export default function Mesas() {
                         value={pago.efectivo}
                         onChange={e => setPago(p => ({ ...p, efectivo: e.target.value }))}
                         style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border)',
-                          borderRadius:8, padding:'6px 8px', color:'white',
+                          borderRadius:8, padding:'6px 8px', color:'var(--text)',
                           fontFamily:'var(--mono)', fontSize:15, fontWeight:700,
                           outline:'none' }} />
                     </div>

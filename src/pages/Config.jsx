@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { useSession, useToast } from '../components/Layout'
 import { getSession, updateSession, ROLE_INFO } from '../lib/auth'
+import { TEMAS, getTema, setTema } from '../lib/tema'
 
 const gestionarAuthResto = httpsCallable(functions, 'gestionarAuthResto')
 
@@ -23,6 +24,7 @@ export default function Config() {
   const [confirmEliminarId, setConfirmEliminarId] = useState(null)
   const [pinVisible, setPinVisible] = useState({})
   const [pinsDefecto, setPinsDefecto] = useState(() => getSession()?.pinsPorDefecto || [])
+  const [temaActual, setTemaActual] = useState(getTema)
 
   useEffect(() => { if (restoId) loadConfig() }, [restoId])
 
@@ -245,6 +247,25 @@ export default function Config() {
       {/* General */}
       {tab === 'general' && (
         <div style={{ padding:20 }}>
+          <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2,
+            textTransform:'uppercase', marginBottom:10 }}>Apariencia (este dispositivo)</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:6 }}>
+            {TEMAS.map(t => (
+              <button key={t.id} onClick={() => { setTema(t.id); setTemaActual(t.id) }}
+                style={{ background: temaActual===t.id ? 'rgba(245,166,35,.12)' : 'var(--card)',
+                  border:`1.5px solid ${temaActual===t.id ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius:12, padding:'12px 6px', cursor:'pointer',
+                  color: temaActual===t.id ? 'var(--accent)' : 'var(--text)',
+                  fontFamily:'var(--font)', fontWeight:800, fontSize:13 }}>
+                <div style={{ fontSize:22, marginBottom:4 }}>{t.icon}</div>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize:11, color:'var(--muted)', marginBottom:22, lineHeight:1.5 }}>
+            {TEMAS.find(t => t.id === temaActual)?.desc}. Cada celular o tablet elige el suyo; también se cambia con el botón Tema del menú de abajo.
+          </div>
+
           <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2,
             textTransform:'uppercase', marginBottom:16 }}>Opciones de cobro</div>
 

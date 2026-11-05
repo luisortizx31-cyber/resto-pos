@@ -3,6 +3,7 @@ import { useState, createContext, useContext, useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 import { getSession, clearSession, canAccess, saveLastRestoId } from '../lib/auth'
+import { TEMAS, getTema, setTema } from '../lib/tema'
 
 export const ToastContext   = createContext(null)
 export const SessionContext = createContext(null)
@@ -64,6 +65,16 @@ export default function Layout() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000)
   }
 
+  // Botón Tema: rota Auto → Día → Noche (ver lib/tema.js)
+  const [tema, setTemaState] = useState(getTema)
+  const temaInfo = TEMAS.find(t => t.id === tema) || TEMAS[2]
+  const cambiarTema = () => {
+    const sig = TEMAS[(TEMAS.findIndex(t => t.id === tema) + 1) % TEMAS.length]
+    setTema(sig.id)
+    setTemaState(sig.id)
+    showToast(`${sig.icon} Tema: ${sig.label}`)
+  }
+
   const handleLogout = () => {
     const s = getSession()
     if (s?.restoId) saveLastRestoId(s.restoId)
@@ -102,6 +113,11 @@ export default function Layout() {
                   {item.label}
                 </NavLink>
               ))}
+              <button className="nav-item" onClick={cambiarTema}
+                style={{ border:'none', background:'none' }}>
+                <span className="nav-icon">{temaInfo.icon}</span>
+                {temaInfo.label}
+              </button>
               <button className="nav-item" onClick={handleLogout}
                 style={{ border:'none', background:'none' }}>
                 <span className="nav-icon">🚪</span>

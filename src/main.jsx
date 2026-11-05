@@ -16,6 +16,9 @@ import ClienteMesa from './pages/ClienteMesa'
 import Delivery from './pages/Delivery'
 import Repartidor from './pages/Repartidor'
 import AdminPanel from './pages/AdminPanel'
+import { iniciarTema } from './lib/tema'
+
+iniciarTema()
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null } }
