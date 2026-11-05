@@ -80,6 +80,12 @@ service cloud.firestore {
         allow update: if resource.data.estado == 'activo' && cambia().hasOnly(['items']);
       }
 
+      // Clientes habituales (nombre, celular, cumpleaños) — datos personales:
+      // solo el personal. El mesero/repartidor registra visitas al cobrar/entregar.
+      match /clientes/{clienteId} {
+        allow read, write: if esStaff(restoId);
+      }
+
       // Historial de ventas — solo el personal del restaurante
       match /historial/{histId} {
         allow read: if esStaff(restoId);

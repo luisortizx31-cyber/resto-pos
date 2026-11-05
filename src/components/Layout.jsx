@@ -93,6 +93,7 @@ export default function Layout() {
     { to:'/mesas',     icon:'🍽', label:'Mesas',     page:'mesas' },
     { to:'/cocina',    icon:'🍳', label:'Cocina',     page:'cocina' },
     { to:'/historial', icon:'📋', label:'Historial',  page:'historial' },
+    { to:'/clientes',  icon:'👥', label:'Clientes',   page:'clientes' },
     { to:'/stats',     icon:'📊', label:'Stats',      page:'stats' },
     { to:'/menu',      icon:'✏️', label:'Menú',       page:'menu' },
     { to:'/qr',        icon:'📲', label:'QR',         page:'qr' },

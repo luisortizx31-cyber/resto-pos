@@ -8,6 +8,7 @@ import Mesas from './pages/Mesas'
 import Pedido from './pages/Pedido'
 import Cocina from './pages/Cocina'
 import Historial from './pages/Historial'
+import Clientes from './pages/Clientes'
 import Menu from './pages/Menu'
 import Stats from './pages/Stats'
 import QRMesas from './pages/QRMesas'
@@ -66,6 +67,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="pedido/:mesa" element={<Pedido />} />
             <Route path="cocina"       element={<Cocina />} />
             <Route path="historial"    element={<Historial />} />
+            <Route path="clientes"     element={<Clientes />} />
             <Route path="stats"        element={<Stats />} />
             <Route path="menu"         element={<Menu />} />
             <Route path="qr"           element={<QRMesas />} />

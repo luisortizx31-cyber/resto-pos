@@ -3,6 +3,7 @@ import { rtdb, db } from '../lib/firebase'
 import { ref, onValue, update } from 'firebase/database'
 import { collection, addDoc } from 'firebase/firestore'
 import { useSession, useToast } from '../components/Layout'
+import { registrarVisitaDelivery } from '../lib/clientes'
 
 function Timer({ timeISO }) {
   const [elapsed, setElapsed] = useState(0)
@@ -111,6 +112,8 @@ export default function Repartidor() {
           repartidorNombre: miNombre, repartidorId: miId,
         })
       } catch {}
+      // Cliente habitual: se crea o se le suma la visita (no cuenta dos veces el mismo pedido)
+      try { await registrarVisitaDelivery(restoId, pedido) } catch (e) { console.error('cliente', e) }
     }
     setConfirmando(null)
     showToast('✅ Entregado y guardado en historial')

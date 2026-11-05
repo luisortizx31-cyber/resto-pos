@@ -5,7 +5,7 @@ import { httpsCallable } from 'firebase/functions'
 export const PERMS = {
   mesero:     ['mesas', 'pedido', 'qr'],
   cocina:     ['cocina'],
-  dueno:      ['mesas', 'pedido', 'cocina', 'historial', 'menu', 'stats', 'qr', 'config'],
+  dueno:      ['mesas', 'pedido', 'cocina', 'historial', 'clientes', 'menu', 'stats', 'qr', 'config'],
   repartidor: ['repartidor'],
   superadmin: ['admin'],
 }

@@ -4,6 +4,8 @@ import { rtdb, db } from '../lib/firebase'
 import { ref, onValue, remove, update, set } from 'firebase/database'
 import { collection, addDoc, doc, getDoc, setDoc, updateDoc, query, where, getDocs, arrayUnion } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
+import ClienteCobro from '../components/ClienteCobro'
+import { registrarVisita } from '../lib/clientes'
 import { fmt12, mergeItems, esBebida, esSoloBebidas, repreciarItems, useCategoriasBebida } from '../lib/utils'
 
 export default function Mesas() {
@@ -36,6 +38,7 @@ export default function Mesas() {
     })
   }, [restoId])
   const [pago, setPago]                   = useState({ yape: '', efectivo: '' }) // montos por método
+  const [clienteCobro, setClienteCobro]   = useState(null) // cliente habitual asociado al cobro
   const [itemsEntregados, setItemsEntregados] = useState({}) // { 'nombre__precio': true }
 
   // Auto-llenar efectivo cuando se abre el modal de cobro
@@ -396,6 +399,13 @@ export default function Mesas() {
         await updateDoc(doc(db, 'restaurantes', restoId), { qrMesasOff: arrayUnion(confirming.num) })
       } catch (e) { console.error(e); fallos.push('cerrar QR') }
 
+      // 5. Registrar la visita del cliente habitual, si se asoció uno
+      if (clienteCobro) {
+        try {
+          await registrarVisita(restoId, clienteCobro, { total, tipo: 'mesa' })
+        } catch (e) { console.error(e); fallos.push('registrar la visita del cliente') }
+      }
+
       if (fallos.length) {
         showToast(`⚠️ Venta registrada, pero falló: ${[...new Set(fallos)].join(', ')}. Revisa la mesa ${confirming.num}.`, 'error')
       }
@@ -407,6 +417,7 @@ export default function Mesas() {
         hora: fmt12(new Date().toISOString()) })
       setConfirming(null)
       setPago({ yape:'', efectivo:'' })
+      setClienteCobro(null)
       // Limpiar checks de la mesa al cobrar
       localStorage.removeItem(`gastro_check_mesa_${restoId}_${confirming.num}`)
     } catch { showToast('Error al cobrar','error') }
@@ -885,6 +896,9 @@ export default function Mesas() {
                   <span style={{ color:'var(--green)', fontFamily:'var(--mono)' }}>S/{total.toFixed(2)}</span>
                 </div>
               </div>
+              {/* Cliente habitual (opcional) — registra su visita al cobrar */}
+              <ClienteCobro restoId={restoId} value={clienteCobro} onChange={setClienteCobro} />
+
               {/* Método de pago */}
               <div style={{ background:'var(--surface)', borderRadius:12, padding:12, marginBottom:12 }}>
                 <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:2, textTransform:'uppercase', marginBottom:10 }}>💳 Forma de pago</div>
@@ -983,7 +997,7 @@ export default function Mesas() {
                 ➕ AGREGAR MÁS PEDIDO
               </button>
               <button className="btn btn-ghost" style={{ width:'100%', padding:12 }}
-                onClick={() => { setConfirming(null); setPago({ yape:'', efectivo:'' }) }}>Cancelar</button>
+                onClick={() => { setConfirming(null); setPago({ yape:'', efectivo:'' }); setClienteCobro(null) }}>Cancelar</button>
             </div>
           </div>
         )

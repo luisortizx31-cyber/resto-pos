@@ -5,6 +5,7 @@ import { doc, setDoc, collection } from 'firebase/firestore'
 import { useToast, useSession } from '../components/Layout'
 import { obtenerInfoLogin } from '../lib/auth'
 import { esSoloBebidas, repreciarItems } from '../lib/utils'
+import { registrarVisitaDelivery } from '../lib/clientes'
 
 // ── Timer idéntico al del Repartidor ────────────────────────────────
 function Timer({ timeISO, urgentSecs = 1200, warnSecs = 600 }) {
@@ -212,6 +213,8 @@ export default function DeliveryTab({ restoId, onNuevoPedido }) {
       completedAtISO:     entregadoISO,
       creadoISO:          pedido.timeISO     || entregadoISO,
     })
+    // Cliente habitual: se crea o se le suma la visita (no cuenta dos veces el mismo pedido)
+    try { await registrarVisitaDelivery(restoId, pedido, total) } catch (e) { console.error('cliente', e) }
   }
 
   const toggleDinero = async (key, actual) => {
